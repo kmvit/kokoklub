@@ -4,7 +4,7 @@
     "backend": {
       "root": "backend",
       "framework": "django",
-      "buildCommand": "if [ \"$VERCEL_ENV\" = production ]; then DATABASE_URL=\"$POSTGRES_URL_NON_POOLING\" python manage.py migrate --noinput; fi"
+      "buildCommand": "if [ \"$VERCEL_ENV\" = production ]; then export DATABASE_URL=\"$POSTGRES_URL_NON_POOLING\" && python manage.py migrate --noinput && if [ \"$DEMO_MEMBERS\" = 1 ]; then python manage.py demo_members --no-staff; fi; fi"
     },
     "frontend": {
       "root": "frontend",

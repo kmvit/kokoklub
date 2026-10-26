@@ -29,6 +29,10 @@ DEMO_STAFF_PASSWORD = "koko-demo-staff"
 class Command(BaseCommand):
     help = "Создать тестовых участников с картами (только для разработки)"
 
+    def add_arguments(self, parser):
+        # на публичном сайте демо-персонал не нужен: его пароль лежит в репозитории
+        parser.add_argument("--no-staff", action="store_true", help="не создавать учётку персонала")
+
     def handle(self, *args, **opts):
         for i, (name, activity, occupation, hobbies, status, can_help, looking_for) in enumerate(PEOPLE):
             phone = f"7900000000{i}"
@@ -48,11 +52,11 @@ class Command(BaseCommand):
                 Card.objects.create(member=user, uid=f"04D3A0{i:08X}")
             if i % 2 == 0 and not user.visits.filter(left_at__isnull=True).exists():
                 Visit.objects.create(member=user, card=user.cards.get(is_active=True))
-        staff = User.objects.filter(phone=DEMO_STAFF_PHONE).first() or User.objects.create_user(DEMO_STAFF_PHONE)
-        staff.is_staff = True
-        staff.set_password(DEMO_STAFF_PASSWORD)
-        staff.save()
-        self.stdout.write(self.style.SUCCESS(
-            f"Готово: {len(PEOPLE)} участников, телефоны 79000000000…5; "
-            f"персонал {DEMO_STAFF_PHONE} / {DEMO_STAFF_PASSWORD}"
-        ))
+        done = f"Готово: {len(PEOPLE)} участников, телефоны 79000000000…5"
+        if not opts["no_staff"]:
+            staff = User.objects.filter(phone=DEMO_STAFF_PHONE).first() or User.objects.create_user(DEMO_STAFF_PHONE)
+            staff.is_staff = True
+            staff.set_password(DEMO_STAFF_PASSWORD)
+            staff.save()
+            done += f"; персонал {DEMO_STAFF_PHONE} / {DEMO_STAFF_PASSWORD}"
+        self.stdout.write(self.style.SUCCESS(done))
