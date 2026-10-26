@@ -24,3 +24,8 @@ dist/
 
 # Codespaces
 .logs/
+.vercel
+
+# Vercel
+.vercel
+.env*.local

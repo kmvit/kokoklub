@@ -76,9 +76,11 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Локально можно без Postgres: DB_ENGINE=sqlite (тесты, быстрый запуск без Docker).
-# На Vercel база приходит одной строкой DATABASE_URL (Neon / Vercel Postgres).
-if os.getenv("DATABASE_URL"):
-    db_url = urlparse(os.environ["DATABASE_URL"])
+# На Vercel база приходит одной строкой: DATABASE_URL или POSTGRES_URL от интеграции Neon.
+# POSTGRES_URL идёт через пулер соединений (pgbouncer), с ним нельзя серверные курсоры.
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
+if DATABASE_URL:
+    db_url = urlparse(DATABASE_URL)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -88,6 +90,7 @@ if os.getenv("DATABASE_URL"):
             "HOST": db_url.hostname,
             "PORT": db_url.port or 5432,
             "OPTIONS": {k: v[0] for k, v in parse_qs(db_url.query).items() if k == "sslmode"},
+            "DISABLE_SERVER_SIDE_CURSORS": "pooler" in (db_url.hostname or ""),
         }
     }
 elif os.getenv("DB_ENGINE") == "sqlite":
