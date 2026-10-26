@@ -76,34 +76,45 @@ function Icon({ name }: { name: string }) {
   );
 }
 
-// Герб клуба: щит с монограммой, лавры и лента — как на клубном блейзере.
-function Crest() {
-  const leaves = Array.from({ length: 7 }, (_, i) => i);
+// Диско-шар: зеркальные грани и вспыхивающие блики — как над диваном в зале.
+function DiscoBall() {
+  const rows = [-30, -18, -6, 6, 18, 30];
+  const cols = [8, 20, 30, 37];
+  const glints = [
+    { x: 30, y: 44, d: "0s" },
+    { x: 66, y: 60, d: "0.8s" },
+    { x: 44, y: 82, d: "1.6s" },
+  ];
   return (
-    <svg className="crest" viewBox="0 0 160 170" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden>
-      <path d="M80 8l4 7h-8zM66 14l3 5h-6zM94 14l3 5h-6z" fill="currentColor" stroke="none" />
-      <path d="M48 26h64v46c0 30-32 48-32 48S48 102 48 72z" />
-      <path d="M54 32h52v40c0 25-26 41-26 41S54 97 54 72z" strokeWidth="0.7" />
-      <text x="80" y="86" textAnchor="middle" fill="currentColor" stroke="none" fontFamily="Playfair Display, serif" fontStyle="italic" fontSize="44">
-        К
-      </text>
-      {leaves.map((i) => {
-        const a = (200 - i * 17) * (Math.PI / 180);
-        const x = 80 + Math.cos(a) * 54;
-        const y = 70 - Math.sin(a) * 54;
-        const r = 270 - (200 - i * 17) + 40;
-        return (
-          <g key={i}>
-            <ellipse cx={x} cy={y} rx="3.4" ry="8" transform={`rotate(${-r} ${x} ${y})`} />
-            <ellipse cx={160 - x} cy={y} rx="3.4" ry="8" transform={`rotate(${r} ${160 - x} ${y})`} />
-          </g>
-        );
-      })}
-      <path d="M22 136c20 8 96 8 116 0l-6 14c-24 8-80 8-104 0z" fill="var(--bg)" />
-      <path d="M22 136l-10 6 8 4M138 136l10 6-8 4" />
-      <text x="80" y="148" textAnchor="middle" fill="currentColor" stroke="none" fontFamily="Manrope, sans-serif" fontSize="8.5" fontWeight="700" letterSpacing="3.5">
-        КОКО · КЛУБ
-      </text>
+    <svg className="disco" viewBox="0 0 96 120" aria-hidden>
+      <defs>
+        <radialGradient id="disco-fill" cx="35%" cy="35%" r="75%">
+          <stop offset="0" stopColor="#fff3d6" />
+          <stop offset="0.35" stopColor="var(--accent)" />
+          <stop offset="1" stopColor="#3a2a10" />
+        </radialGradient>
+        <clipPath id="disco-clip">
+          <circle cx="48" cy="72" r="40" />
+        </clipPath>
+      </defs>
+      <path d="M48 0v32" stroke="var(--muted)" strokeWidth="1" />
+      <circle cx="48" cy="72" r="40" fill="url(#disco-fill)" />
+      <g clipPath="url(#disco-clip)" fill="none" stroke="rgb(14 26 28 / 55%)" strokeWidth="1">
+        {rows.map((dy) => (
+          <path key={dy} d={`M8 ${72 + dy}Q48 ${72 + dy + dy * 0.35} 88 ${72 + dy}`} />
+        ))}
+        {cols.map((rx) => (
+          <ellipse key={rx} cx="48" cy="72" rx={rx} ry="40" />
+        ))}
+      </g>
+      {glints.map((g) => (
+        <path
+          key={g.d}
+          className="disco-glint"
+          style={{ animationDelay: g.d }}
+          d={`M${g.x} ${g.y - 7}L${g.x + 1.5} ${g.y - 1.5}L${g.x + 7} ${g.y}L${g.x + 1.5} ${g.y + 1.5}L${g.x} ${g.y + 7}L${g.x - 1.5} ${g.y + 1.5}L${g.x - 7} ${g.y}L${g.x - 1.5} ${g.y - 1.5}z`}
+        />
+      ))}
     </svg>
   );
 }
@@ -116,7 +127,7 @@ const ROOMS = [
   { icon: "stage", title: "Сцена", text: "Концерты, лекции, стендап и камерные выступления — для своих и от своих." },
   { icon: "coffee", title: "Кофе", text: "Зерно спешелти, бариста, который помнит, как вы пьёте." },
   { icon: "whisky", title: "Виски", text: "Коллекция односолодовых и купажей. Подскажем, с чего начать и чем продолжить." },
-  { icon: "style", title: "Стиль", text: "Кожа Честерфилдов, тёмное дерево, латунь и шотландка. Детали — не мелочи." },
+  { icon: "style", title: "Стиль", text: "Кожа цвета коньяка, тростник, горчичные стены и тёплый свет. Детали — не мелочи." },
 ];
 
 const DAY = [
@@ -179,7 +190,7 @@ export default function Landing() {
     <div className="landing" ref={root}>
       {/* ─── Первый экран ─── */}
       <section className="l-hero">
-        <div className="l-hero-board tartan" aria-hidden />
+        <div className="l-hero-board cane" aria-hidden />
         <div className="l-hero-inner">
           <div className="l-hero-text">
             <div className="l-eyebrow">Частный клуб</div>
@@ -203,14 +214,15 @@ export default function Landing() {
             )}
           </div>
 
-          <div className="l-record" aria-hidden>
-            <div className="l-record-disc">
-              <div className="l-record-label">
-                <span>коко</span>
-                <small>side a · 33⅓</small>
+          <div className="l-visual">
+            <div className="l-record" aria-hidden>
+              <div className="l-record-disc">
+                <div className="l-record-label" />
               </div>
             </div>
-            <div className="l-record-arm" />
+            <div className="l-arch">
+              <img src="/img/lounge.jpg" alt="Гостиная клуба: кожаный диван, кресло, шахматы, камин и полки с винилом" />
+            </div>
           </div>
         </div>
         <div className="l-scroll" aria-hidden>
@@ -234,7 +246,7 @@ export default function Landing() {
         </div>
       </div>
 
-      <div className="rep-stripe" aria-hidden />
+      <div className="retro-stripe" aria-hidden />
 
       {/* ─── Манифест ─── */}
       <section className="l-section l-manifest reveal">
@@ -279,23 +291,26 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ─── Дресс-код ─── */}
+      {/* ─── Атмосфера ─── */}
       <section className="l-dress reveal">
         <div className="l-dress-inner">
-          <div className="l-dress-pattern tartan" aria-hidden />
+          <div className="l-dress-photo">
+            <img src="/img/vinyl.jpg" alt="Музыкальный угол: диджейский пульт, полки с пластинками и колонками" loading="lazy" />
+          </div>
           <div className="l-dress-text">
-            <div className="l-num">Дресс-код</div>
+            <div className="l-num">Атмосфера</div>
             <h2>
-              Smart <em>casual</em>
+              Тёплый свет, <em>живой звук</em>
             </h2>
             <p>
-              Интерьер в духе старого английского клуба: зелёные стены, бордовая кожа, полированное дерево и мягкий
-              латунный свет. Хочется соответствовать.
+              Горчичные и тёмно-бирюзовые стены, кожа цвета коньяка, стулья с тростниковыми спинками и мягкий янтарный
+              свет. Немного семидесятых — и ничего случайного.
             </p>
             <ul className="l-dress-list">
-              <li>Твид, кашемир, оксфорды</li>
-              <li>Пиджак — всегда к месту</li>
-              <li>Спортивное — для спортзала</li>
+              <li>Винил, пульт и Hi-Fi на полках</li>
+              <li>Камин и шахматы у дивана</li>
+              <li>Диско-шары под потолком</li>
+              <li>Проектор и экран для кино</li>
             </ul>
           </div>
         </div>
@@ -328,7 +343,7 @@ export default function Landing() {
 
       {/* ─── Финал ─── */}
       <section className="l-final reveal">
-        <Crest />
+        <DiscoBall />
         <h2>
           Ваш стол <em>уже ждёт</em>
         </h2>

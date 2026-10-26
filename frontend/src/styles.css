@@ -1,17 +1,17 @@
-/* Стиль клуба — английский клуб в духе Ralph Lauren: гоночный зелёный, бордовая кожа,
-   латунь, слоновая кость. Всё оформление — на токенах ниже. */
+/* Стиль клуба — по интерьеру: тёмно-бирюзовые и горчичные стены, кожа цвета коньяка,
+   тростник, винил и янтарный свет. Всё оформление — на токенах ниже. */
 :root {
   color-scheme: dark;
-  --bg: #0e1913;
-  --surface: #14221a;
-  --surface-2: #1c2d23;
-  --ink: #f0e8d8;
-  --muted: #a49c88;
-  --line: #2a3b31;
-  --accent: #bf9a5c;
-  --accent-ink: #0e1913;
-  --wine: #6e2320;
-  --navy: #14223a;
+  --bg: #0e1a1c;
+  --surface: #142427;
+  --surface-2: #1c2f33;
+  --ink: #f3e9d6;
+  --muted: #a7a08f;
+  --line: #27393c;
+  --accent: #e0a82e;
+  --accent-ink: #1a1408;
+  --cognac: #b4532a;
+  --petrol: #1f3d5c;
   --accent-soft: rgb(200 164 106 / 14%);
   --ok: #8fb07f;
   --ok-soft: rgb(143 176 127 / 15%);
@@ -32,7 +32,7 @@
 
 body {
   margin: 0;
-  background: var(--bg) radial-gradient(1200px 600px at 80% -10%, rgb(191 154 92 / 8%), transparent 60%) no-repeat;
+  background: var(--bg) radial-gradient(1200px 600px at 80% -10%, rgb(224 168 46 / 9%), transparent 60%) no-repeat;
   color: var(--ink);
   font-family: var(--font);
   font-size: 16px;
@@ -102,7 +102,7 @@ h3 {
   position: fixed;
   left: 0;
   right: 0;
-  background: linear-gradient(rgb(14 25 19 / 80%), transparent);
+  background: linear-gradient(rgb(14 26 28 / 80%), transparent);
   backdrop-filter: none;
   border-color: transparent;
 }
@@ -1011,7 +1011,7 @@ a.list-row:hover {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: #0a120e;
+  background: #091214;
   color: var(--ink);
   transition: background 0.3s;
   position: relative;
@@ -1022,11 +1022,11 @@ a.list-row:hover {
 }
 
 .entrance.exit {
-  background: var(--navy);
+  background: var(--petrol);
 }
 
 .entrance.error {
-  background: var(--wine);
+  background: #6b2a1a;
 }
 
 .entrance-exit {
@@ -1076,10 +1076,10 @@ a.list-row:hover {
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgb(191 154 92 / 60%);
+    box-shadow: 0 0 0 0 rgb(224 168 46 / 60%);
   }
   100% {
-    box-shadow: 0 0 0 40px rgb(191 154 92 / 0%);
+    box-shadow: 0 0 0 40px rgb(224 168 46 / 0%);
   }
 }
 
@@ -1271,31 +1271,26 @@ a.list-row:hover {
   isolation: isolate;
 }
 
-/* шотландка клуба: зелёная клетка с тёмно-синими полосами, бордовой и латунной нитью */
-.tartan {
+/* тростниковое плетение — как спинки стульев в зале */
+.cane {
   background:
-    repeating-linear-gradient(90deg, transparent 0 46px, rgb(191 154 92 / 35%) 46px 47px, transparent 47px 96px),
-    repeating-linear-gradient(0deg, transparent 0 46px, rgb(191 154 92 / 35%) 46px 47px, transparent 47px 96px),
-    repeating-linear-gradient(90deg, transparent 0 14px, rgb(110 35 32 / 55%) 14px 17px, transparent 17px 96px),
-    repeating-linear-gradient(0deg, transparent 0 14px, rgb(110 35 32 / 55%) 14px 17px, transparent 17px 96px),
-    repeating-linear-gradient(90deg, rgb(20 34 58 / 60%) 0 30px, transparent 30px 62px, rgb(20 34 58 / 30%) 62px 72px, transparent 72px 96px),
-    repeating-linear-gradient(0deg, rgb(20 34 58 / 60%) 0 30px, transparent 30px 62px, rgb(20 34 58 / 30%) 62px 72px, transparent 72px 96px),
-    #12241a;
+    radial-gradient(circle, transparent 0 5px, rgb(224 168 46 / 22%) 5.5px 6.5px, transparent 7px) 0 0 / 22px 22px,
+    repeating-linear-gradient(45deg, transparent 0 14.5px, rgb(224 168 46 / 9%) 14.5px 16px),
+    repeating-linear-gradient(-45deg, transparent 0 14.5px, rgb(224 168 46 / 9%) 14.5px 16px);
 }
 
 .l-hero-board {
   position: absolute;
   inset: 0;
   z-index: -1;
-  opacity: 0.55;
-  mask-image: radial-gradient(ellipse 75% 65% at 70% 50%, #000 5%, transparent 75%);
+  opacity: 0.5;
+  mask-image: radial-gradient(ellipse 60% 70% at 72% 50%, #000 5%, transparent 72%);
 }
 
-/* полоска клубного галстука */
-.rep-stripe {
-  height: 14px;
-  background: repeating-linear-gradient(-45deg, var(--wine) 0 10px, var(--accent) 10px 12px, var(--navy) 12px 22px, var(--accent) 22px 24px);
-  opacity: 0.9;
+/* полосы в духе 70-х: горчица, коньяк, бирюза */
+.retro-stripe {
+  height: 18px;
+  background: linear-gradient(var(--accent) 0 33%, var(--cognac) 33% 66%, var(--petrol) 66%);
 }
 
 .l-hero::after {
@@ -1303,7 +1298,7 @@ a.list-row:hover {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(600px 400px at 72% 50%, rgb(191 154 92 / 12%), transparent 70%);
+  background: radial-gradient(600px 400px at 72% 50%, rgb(224 168 46 / 14%), transparent 70%);
 }
 
 .l-hero-inner {
@@ -1373,12 +1368,37 @@ a.list-row:hover {
   }
 }
 
-/* пластинка */
-.l-record {
+/* фото зала в арке, из-за неё выглядывает пластинка */
+.l-visual {
   position: relative;
-  width: min(100%, 520px);
-  aspect-ratio: 1;
+  width: min(100%, 460px);
   justify-self: center;
+}
+
+.l-arch {
+  position: relative;
+  z-index: 1;
+  aspect-ratio: 3 / 4;
+  border-radius: 999px 999px 4px 4px;
+  overflow: hidden;
+  box-shadow: 0 40px 80px rgb(0 0 0 / 55%);
+  outline: 1px solid rgb(224 168 46 / 45%);
+  outline-offset: 10px;
+}
+
+.l-arch img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.l-record {
+  position: absolute;
+  top: 12%;
+  right: -26%;
+  width: 62%;
+  aspect-ratio: 1;
 }
 
 .l-record-disc {
@@ -1386,18 +1406,17 @@ a.list-row:hover {
   inset: 0;
   border-radius: 50%;
   background:
-    radial-gradient(circle, transparent 0 31%, rgb(255 255 255 / 4%) 31.5% 32%, transparent 32.5%),
-    repeating-radial-gradient(circle, #121010 0 2px, #0a0909 2px 4px),
-    #0b0a09;
+    repeating-radial-gradient(circle, #121414 0 2px, #0a0b0b 2px 4px),
+    #0b0c0c;
   box-shadow:
-    0 40px 80px rgb(0 0 0 / 60%),
+    0 30px 60px rgb(0 0 0 / 60%),
     0 0 0 1px rgb(255 255 255 / 5%);
   display: grid;
   place-items: center;
   animation: spin 9s linear infinite;
 }
 
-/* блик на винилe */
+/* блик на виниле */
 .l-record-disc::after {
   content: "";
   position: absolute;
@@ -1408,71 +1427,10 @@ a.list-row:hover {
 }
 
 .l-record-label {
-  width: 30%;
+  width: 34%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--bg) 0 6%, var(--wine) 6.5% 88%, var(--accent) 89% 91%, var(--wine) 92%);
-  color: var(--accent);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  text-align: center;
-}
-
-.l-record-label span {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: clamp(18px, 2.4vw, 30px);
-  line-height: 1;
-  transform: translateY(-80%);
-}
-
-.l-record-label small {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  transform: translateY(160%);
-}
-
-.l-record-arm {
-  position: absolute;
-  top: -4%;
-  right: -2%;
-  width: 6px;
-  height: 58%;
-  background: linear-gradient(90deg, #8a7148, var(--accent), #8a7148);
-  border-radius: 3px;
-  transform-origin: top center;
-  transform: rotate(24deg);
-  box-shadow: 0 10px 20px rgb(0 0 0 / 50%);
-}
-
-.l-record-arm::before {
-  content: "";
-  position: absolute;
-  top: -14px;
-  left: 50%;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  background: radial-gradient(circle, var(--accent) 0 30%, #2a241c 32%);
-  border: 1px solid #3a3226;
-}
-
-.l-record-arm::after {
-  content: "";
-  position: absolute;
-  bottom: -18px;
-  left: 50%;
-  width: 18px;
-  height: 26px;
-  transform: translateX(-50%) rotate(-24deg);
-  background: var(--accent);
-  border-radius: 2px;
+  background: radial-gradient(circle, var(--bg) 0 6%, var(--cognac) 6.5% 86%, var(--accent) 87% 90%, var(--cognac) 91%);
 }
 
 @keyframes spin {
@@ -1683,19 +1641,38 @@ a.list-row:hover {
   text-align: center;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  background: radial-gradient(500px 240px at 50% 100%, rgb(191 154 92 / 10%), transparent 70%);
+  background: radial-gradient(500px 240px at 50% 100%, rgb(224 168 46 / 12%), transparent 70%);
 }
 
-/* герб клуба */
-.crest {
-  width: 120px;
+/* диско-шар над финалом, как над диваном в зале */
+.disco {
+  width: 96px;
   height: auto;
-  color: var(--accent);
   margin: 0 auto 32px;
   display: block;
+  overflow: visible;
 }
 
-/* блок «Дресс-код» на шотландке */
+.disco-glint {
+  fill: #fff;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: glint 2.4s ease-in-out infinite;
+}
+
+@keyframes glint {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* блок «Атмосфера»: фото и список */
 .l-dress {
   position: relative;
   max-width: 1200px;
@@ -1709,9 +1686,17 @@ a.list-row:hover {
   border: 1px solid var(--line);
 }
 
-.l-dress-pattern {
-  min-height: 360px;
+.l-dress-photo {
+  min-height: 460px;
   border-right: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.l-dress-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .l-dress-text {
@@ -1796,6 +1781,7 @@ a.list-row:hover {
 
   .l-record-disc,
   .l-record-disc::after,
+  .disco-glint,
   .l-marquee-track,
   .l-live-dot {
     animation: none;
@@ -1807,9 +1793,10 @@ a.list-row:hover {
     grid-template-columns: 1fr;
   }
 
-  .l-record {
-    width: min(80%, 380px);
+  .l-visual {
+    width: min(64%, 340px);
     order: -1;
+    margin-right: 18%;
   }
 
   .l-rooms {
@@ -1826,8 +1813,9 @@ a.list-row:hover {
     grid-template-columns: 1fr;
   }
 
-  .l-dress-pattern {
-    min-height: 160px;
+  .l-dress-photo {
+    min-height: 0;
+    aspect-ratio: 4 / 3;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
@@ -1838,8 +1826,8 @@ a.list-row:hover {
     padding: 140px 16px 96px;
   }
 
-  .l-record {
-    width: 72%;
+  .l-visual {
+    width: 58%;
   }
 
   .l-section {

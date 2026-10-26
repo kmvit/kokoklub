@@ -21,3 +21,6 @@ dist/
 .idea/
 .vscode/
 .claude/
+
+# Codespaces
+.logs/

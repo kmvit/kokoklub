@@ -10,6 +10,8 @@ export default defineConfig({
   server: {
     host: true,
     port: 5180,
+    // GitHub Codespaces открывает портал по адресу вида <имя>-5180.app.github.dev
+    allowedHosts: [".app.github.dev"],
     proxy: {
       "/api": apiTarget,
       "/media": apiTarget,

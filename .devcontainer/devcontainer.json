@@ -1,0 +1,23 @@
+// Запуск в GitHub Codespaces: Code → Codespaces → Create codespace on main.
+// Без Docker и Postgres — SQLite и тестовые участники, чтобы быстро показать сайт по ссылке.
+{
+  "name": "Клуб Коко",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "forwardPorts": [5180, 8001],
+  "portsAttributes": {
+    "5180": { "label": "Портал", "onAutoForward": "openBrowser" },
+    "8001": { "label": "API (Django)", "onAutoForward": "silent" }
+  },
+  // один раз при создании: зависимости, .env, база с тестовыми участниками
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  // при каждом запуске: бэкенд и фронтенд в фоне
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  }
+}

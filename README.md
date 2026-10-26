@@ -65,6 +65,20 @@ cd frontend && npm install && npm run dev
 
 Тесты: `DB_ENGINE=sqlite .venv/bin/python manage.py test` из `backend/`.
 
+## Показать сайт по ссылке (GitHub Codespaces)
+
+На GitHub: **Code → Codespaces → Create codespace on main**. Первый запуск — 3–5 минут:
+ставятся зависимости, создаётся база SQLite с тестовыми участниками (`.devcontainer/`).
+Потом портал откроется сам; адрес вида `https://<имя>-5180.app.github.dev`.
+
+- Чтобы ссылка открывалась у других без входа в GitHub: вкладка **Ports** → порт 5180 →
+  правый клик → **Port Visibility → Public**.
+- Вход участника — телефон `79000000000`…`79000000005`, код из SMS смотреть в терминале:
+  `grep "SMS для" .logs/backend.log | tail -1`.
+- Персонал — http://…/staff/login, `79990000001` / `koko-demo-staff`.
+- Codespace засыпает через ~30 минут без активности; после пробуждения портал поднимается сам.
+  Это демо, не прод: данные тестовые, пароль персонала общий.
+
 ## Что дальше
 
 - Свой дизайн клуба: всё оформление на токенах в начале `frontend/src/styles.css`.
