@@ -2,15 +2,28 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from django.core.exceptions import ImproperlyConfigured
 
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-change-me")
-DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
+# На Vercel (переменная VERCEL ставится платформой) — прод по умолчанию: без DEBUG,
+# с обязательным секретным ключом и адресами *.vercel.app.
+ON_VERCEL = bool(os.getenv("VERCEL"))
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if ON_VERCEL:
+        raise ImproperlyConfigured("Задайте DJANGO_SECRET_KEY в переменных окружения Vercel")
+    SECRET_KEY = "dev-insecure-change-me"
+DEBUG = os.getenv("DJANGO_DEBUG", "0" if ON_VERCEL else "1") == "1"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+if ON_VERCEL:
+    ALLOWED_HOSTS.append(".vercel.app")
 if DEBUG:
     ALLOWED_HOSTS = ["*"]
 
@@ -63,7 +76,21 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Локально можно без Postgres: DB_ENGINE=sqlite (тесты, быстрый запуск без Docker).
-if os.getenv("DB_ENGINE") == "sqlite":
+# На Vercel база приходит одной строкой DATABASE_URL (Neon / Vercel Postgres).
+if os.getenv("DATABASE_URL"):
+    db_url = urlparse(os.environ["DATABASE_URL"])
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": db_url.path.lstrip("/"),
+            "USER": db_url.username,
+            "PASSWORD": db_url.password,
+            "HOST": db_url.hostname,
+            "PORT": db_url.port or 5432,
+            "OPTIONS": {k: v[0] for k, v in parse_qs(db_url.query).items() if k == "sslmode"},
+        }
+    }
+elif os.getenv("DB_ENGINE") == "sqlite":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -140,6 +167,8 @@ CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5180,http://127.0.0.1:5180"
 ).split(",")
 CSRF_TRUSTED_ORIGINS = [o for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+if ON_VERCEL:
+    CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
