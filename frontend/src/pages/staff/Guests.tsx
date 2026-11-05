@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
-import { Avatar, Modal, useToast } from "../../components/ui";
+import { Modal, useToast } from "../../components/ui";
 import { formatPhone, type StaffMember } from "../../types";
 import { useNfcReader } from "../../useNfcReader";
+import StaffPhoto from "./StaffPhoto";
 
 function cardState(m: StaffMember) {
-  if (m.card) return <span className="pill ok">карта {m.card.uid}</span>;
+  if (m.card) return <span className="pill ok">Карта активна</span>;
   if (!m.profile_complete) return <span className="pill">анкета не заполнена</span>;
   return <span className="pill warn">ждёт карту</span>;
 }
@@ -56,7 +57,6 @@ export default function Guests() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [list, setList] = useState<StaffMember[] | null>(null);
-  const [revoking, setRevoking] = useState<StaffMember | null>(null);
   const [creating, setCreating] = useState(false);
   const [scanError, setScanError] = useState("");
   const nfc = useNfcReader();
@@ -85,18 +85,7 @@ export default function Guests() {
     return () => window.clearTimeout(t);
   }, [load]);
 
-  const replace = (m: StaffMember) => setList((prev) => [m, ...(prev ?? []).filter((x) => x.id !== m.id)]);
-
-  const toggleHidden = async (m: StaffMember) => {
-    replace(await api.patch<StaffMember>(`/staff/members/${m.id}/`, { is_hidden: !m.is_hidden }));
-  };
-
-  const revoke = async () => {
-    if (!revoking) return;
-    replace(await api.del<StaffMember>(`/staff/members/${revoking.id}/card/`));
-    setRevoking(null);
-    notify("Карта отвязана");
-  };
+  const addGuest = (m: StaffMember) => setList((prev) => [m, ...(prev ?? []).filter((x) => x.id !== m.id)]);
 
   return (
     <>
@@ -122,34 +111,26 @@ export default function Guests() {
       ) : list.length === 0 ? (
         <div className="empty">Никого не нашли. Гость ещё не заполнил анкету — дайте ему QR или создайте вручную.</div>
       ) : (
-        <div className="card list">
+        <div className="staff-guests-grid">
           {list.map((m) => (
-            <div key={m.id} className="list-row">
-              <Avatar name={m.full_name || "?"} photo={m.photo} size={48} />
-              <div className="list-main">
-                <div className="list-title">
-                  {m.full_name || "Без имени"} {m.in_club && <span className="badge-club">в клубе</span>}
-                  {m.is_hidden && <span className="pill bad">скрыт</span>}
+            <article key={m.id} className="card staff-guest-card">
+              <StaffPhoto name={m.full_name || "Гость"} photo={m.photo} />
+              <div className="staff-guest-card-body">
+                <h2>{m.full_name || "Без имени"}</h2>
+                <a className="staff-guest-card-phone" href={`tel:+${m.phone}`}>{formatPhone(m.phone)}</a>
+                <div className="staff-guest-card-status">
+                  {cardState(m)}
+                  {m.in_club && <span className="pill ok">Сейчас в клубе</span>}
+                  {m.is_hidden && <span className="pill bad">Скрыт</span>}
                 </div>
-                <div className="muted small">
-                  {formatPhone(m.phone)} · {cardState(m)}
+                <div className="staff-guest-card-actions">
+                  <Link className="btn" to={`/staff/guests/${m.id}`}>Посмотреть гостя</Link>
+                  <Link className="btn btn-ghost" to={`/staff/bind?member=${m.id}`}>
+                    {m.card ? "Перевыпустить карту" : "Выдать карту"}
+                  </Link>
                 </div>
               </div>
-              <div className="row-actions">
-                <Link className="btn btn-small btn-ghost" to={`/staff/guests/${m.id}`}>Посмотреть</Link>
-                <Link className="btn btn-small" to={`/staff/bind?member=${m.id}`}>
-                  {m.card ? "Перевыпустить" : "Выдать карту"}
-                </Link>
-                {m.card && (
-                  <button className="link" onClick={() => setRevoking(m)}>
-                    Отвязать
-                  </button>
-                )}
-                <button className="link" onClick={() => toggleHidden(m)}>
-                  {m.is_hidden ? "Показать" : "Скрыть"}
-                </button>
-              </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
@@ -158,27 +139,11 @@ export default function Guests() {
         <NewGuest
           onClose={() => setCreating(false)}
           onDone={(m) => {
-            replace(m);
+            addGuest(m);
             setCreating(false);
             navigate(`/staff/bind?member=${m.id}`);
           }}
         />
-      )}
-      {revoking && (
-        <Modal title="Отвязать карту?" onClose={() => setRevoking(null)}>
-          <p>
-            Карта {revoking.card?.uid} перестанет работать, а {revoking.full_name || "гость"} пропадёт из каталога,
-            пока не получит новую.
-          </p>
-          <div className="modal-actions">
-            <button className="btn btn-ghost" onClick={() => setRevoking(null)}>
-              Отмена
-            </button>
-            <button className="btn btn-danger" onClick={revoke}>
-              Отвязать
-            </button>
-          </div>
-        </Modal>
       )}
     </>
   );

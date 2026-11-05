@@ -49,14 +49,25 @@ function StatusMenu() {
 
 export default function Layout() {
   const { me, reload } = useAuth();
-  const landing = useLocation().pathname === "/";
+  const pathname = useLocation().pathname;
+  const landing = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // бар клуба живёт в Падаче — ссылка на меню приходит из настроек бэкенда
   const [menuUrl, setMenuUrl] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<{ menu_url: string | null }>("/site/").then((s) => setMenuUrl(s.menu_url)).catch(() => {});
   }, []);
+
+  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileMenuOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileMenuOpen]);
 
   // счётчик непрочитанных обновляется, когда человек возвращается на вкладку
   useEffect(() => {
@@ -81,7 +92,7 @@ export default function Layout() {
           <Link to="/" className="logo">
             коко<span>клуб</span>
           </Link>
-          <nav className="nav">
+          <nav className={`nav ${mobileMenuOpen ? "nav-open" : ""}`} id="site-navigation" aria-label="Основная навигация" onClick={() => setMobileMenuOpen(false)}>
             <NavLink to="/" end>
               Клуб
             </NavLink>
@@ -107,6 +118,16 @@ export default function Layout() {
               </Link>
             )}
           </div>
+          <button
+            className="header-menu-toggle"
+            type="button"
+            aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-controls="site-navigation"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span aria-hidden="true" /><span aria-hidden="true" /><span aria-hidden="true" />
+          </button>
         </div>
       </header>
       <main className={landing ? "main main-full" : "main"}>

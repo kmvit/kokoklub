@@ -181,6 +181,8 @@ h3 {
   gap: 10px;
 }
 
+.header-menu-toggle { display: none; }
+
 .me-link {
   display: flex;
 }
@@ -952,6 +954,28 @@ a.list-row:hover {
   margin-bottom: 16px;
 }
 
+.staff-guests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  align-items: start;
+  gap: 20px;
+}
+
+.staff-guest-card {
+  padding: 0;
+  overflow: hidden;
+  border-color: #405358;
+  box-shadow: 0 16px 32px rgb(0 0 0 / 25%);
+}
+
+.staff-guest-card .staff-photo { aspect-ratio: 16 / 10; max-height: 320px; }
+.staff-guest-card-body { padding: 22px; }
+.staff-guest-card h2 { margin: 0 0 6px; font-size: 23px; line-height: 1.2; }
+.staff-guest-card-phone { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); text-decoration: none; }
+.staff-guest-card-status { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.staff-guest-card-actions { display: grid; gap: 8px; margin-top: 24px; }
+.staff-guest-card-actions .btn { width: 100%; min-height: 48px; white-space: normal; text-align: center; }
+
 .staff-guest-detail {
   display: block;
   max-width: 680px;
@@ -964,6 +988,10 @@ a.list-row:hover {
 .staff-guest-info { padding: 24px; }
 .staff-guest-info > p { margin: 14px 0 0; }
 .staff-guest-info > .btn { margin-top: 24px; }
+.staff-guest-manage { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+.staff-guest-manage h2 { width: 100%; margin: 0 0 4px; font-size: 18px; }
+.staff-guest-manage .btn { min-height: 48px; }
+.staff-guest-manage .error { width: 100%; }
 .staff-guest-status { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .staff-phone { display: inline-block; font-size: 22px; font-weight: 700; color: var(--accent); text-decoration: none; }
 .staff-back { display: inline-flex; align-items: center; min-height: 44px; }
@@ -994,14 +1022,6 @@ a.list-row:hover {
 .bind-success { padding: 24px; margin-top: 24px; }
 .bind-success h2 { margin-top: 0; }
 .bind-success-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
-
-.row-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
 
 .inside-card {
   display: flex;
@@ -1195,29 +1215,56 @@ a.list-row:hover {
     padding-top: 24px;
   }
 
-  .nav {
-    justify-content: flex-start;
-  }
-
-  .nav a {
-    padding: 6px 10px 6px 0;
-    margin-right: 8px;
-  }
-
   .header-inner {
-    gap: 8px 10px;
-    flex-wrap: wrap;
+    gap: 10px;
+    position: relative;
   }
 
-  /* на телефоне разделы уходят второй строкой, иначе «Сообщения» обрезаются */
   .nav {
-    order: 3;
-    flex-basis: 100%;
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 8px 16px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 14px 24px rgb(0 0 0 / 30%);
+    overflow: visible;
+  }
+
+  .nav.nav-open { display: flex; flex-direction: column; }
+  .nav a {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--line);
   }
 
   .header-right {
     margin-left: auto;
   }
+
+  .header-menu-toggle {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    cursor: pointer;
+  }
+
+  .header-menu-toggle span { width: 18px; height: 2px; background: var(--ink); }
+  .header-menu-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .hide-sm {
     display: none;
@@ -1248,11 +1295,6 @@ a.list-row:hover {
 
   .list-row {
     flex-wrap: wrap;
-  }
-
-  .row-actions {
-    width: 100%;
-    justify-content: flex-start;
   }
 
   .staff-page {
@@ -1313,11 +1355,10 @@ a.list-row:hover {
   .staff-guest-detail .staff-photo { aspect-ratio: 1 / 1; max-height: none; }
   .staff-phone { min-height: 44px; display: inline-flex; align-items: center; }
   .staff-guest-status { flex-direction: column; align-items: flex-start; }
+  .staff-guest-manage { flex-direction: column; }
+  .staff-guest-manage .btn { width: 100%; white-space: normal; }
   .inside-foot { flex-direction: column; align-items: flex-start; }
   .inside-foot .link { min-height: 44px; display: inline-flex; align-items: center; }
-  .row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .row-actions .btn { width: 100%; min-width: 0; min-height: 48px; padding: 9px 6px; font-size: 10px; white-space: normal; text-align: center; }
-  .row-actions .link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; }
 
   .bind-selected { flex-wrap: wrap; }
   .bind-selected .link { margin-left: 0; }
