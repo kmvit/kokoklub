@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { Avatar } from "../../components/ui";
-import type { InsideVisit } from "../../types";
+import type { InsideVisit, StaffMember } from "../../types";
 import { useCardReader } from "../../useCardReader";
+import { useNfcReader } from "../../useNfcReader";
 
 type Result =
   | { kind: "enter" | "exit"; name: string; photo: string | null }
@@ -13,6 +14,19 @@ type Result =
 // карту — видит приветствие, через пару секунд экран снова ждёт.
 export default function Entrance() {
   const [result, setResult] = useState<Result | null>(null);
+  const navigate = useNavigate();
+  const nfc = useNfcReader();
+
+  const showGuest = async () => {
+    await nfc.start(async (uid) => {
+      try {
+        const guest = await api.post<StaffMember>("/staff/card-lookup/", { uid });
+        navigate(`/staff/guests/${guest.id}`);
+      } catch (error) {
+        setResult({ kind: "error", text: (error as Error).message });
+      }
+    });
+  };
 
   useEffect(() => {
     if (!result) return;
@@ -39,6 +53,13 @@ export default function Entrance() {
           <div className="entrance-logo">коко клуб</div>
           <div className="entrance-title">Приложите карту</div>
           <div className="entrance-pulse" />
+          <button className="btn" onClick={nfc.scanning ? nfc.stop : showGuest}>
+            {nfc.scanning ? "Отменить считывание" : "Посмотреть гостя по NFC"}
+          </button>
+          <div className="entrance-sub">
+            {nfc.scanning ? "Считывание включено — теперь приложите метку к телефону" : "На телефоне сначала нажмите кнопку, затем приложите метку"}
+          </div>
+          {nfc.error && <div className="error" role="alert">{nfc.error}</div>}
         </div>
       )}
       {result && result.kind !== "error" && (
