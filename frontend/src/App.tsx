@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
+import { stopEntranceNfc } from "./entranceNfc";
 import Layout from "./components/Layout";
 import Catalog from "./pages/Catalog";
 import Chat from "./pages/Chat";
@@ -26,9 +27,17 @@ function RequireAuth({ children, staff = false }: { children: ReactNode; staff?:
   return <>{children}</>;
 }
 
+function EntranceScanBoundary() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (pathname !== "/staff/entrance") stopEntranceNfc();
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
-    <Routes>
+    <><EntranceScanBoundary /><Routes>
       <Route element={<Layout />}>
         <Route index element={<Landing />} />
         <Route path="people" element={<Catalog />} />
@@ -48,6 +57,6 @@ export default function App() {
       {/* экран у входа — на весь экран, без шапки портала */}
       <Route path="staff/entrance" element={<RequireAuth staff><Entrance /></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></>
   );
 }

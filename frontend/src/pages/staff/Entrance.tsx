@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { Avatar } from "../../components/ui";
+import { beginEntranceNfc, getEntranceNfc, subscribeEntranceNfc, stopEntranceNfc } from "../../entranceNfc";
 import type { InsideVisit, StaffMember } from "../../types";
 import { useCardReader } from "../../useCardReader";
-import { useNfcReader } from "../../useNfcReader";
 
 type Result =
   | { kind: "enter" | "exit"; name: string; photo: string | null }
@@ -15,18 +15,26 @@ type Result =
 export default function Entrance() {
   const [result, setResult] = useState<Result | null>(null);
   const navigate = useNavigate();
-  const nfc = useNfcReader();
+  const nfc = useSyncExternalStore(subscribeEntranceNfc, getEntranceNfc);
+  const processed = useRef<string | null>(null);
 
-  const showGuest = async () => {
-    await nfc.start(async (uid) => {
-      try {
-        const guest = await api.post<StaffMember>("/staff/card-lookup/", { uid });
-        navigate(`/staff/guests/${guest.id}`);
-      } catch (error) {
-        setResult({ kind: "error", text: (error as Error).message });
-      }
-    });
+  const toggleScan = () => {
+    if (nfc.status === "scanning") {
+      stopEntranceNfc();
+      return;
+    }
+    processed.current = null;
+    setResult(null);
+    beginEntranceNfc();
   };
+
+  useEffect(() => {
+    if (nfc.status !== "read" || !nfc.uid || processed.current === nfc.uid) return;
+    processed.current = nfc.uid;
+    api.post<StaffMember>("/staff/card-lookup/", { uid: nfc.uid })
+      .then((guest) => navigate(`/staff/guests/${guest.id}`))
+      .catch((error) => setResult({ kind: "error", text: (error as Error).message }));
+  }, [nfc, navigate]);
 
   useEffect(() => {
     if (!result) return;
@@ -45,20 +53,15 @@ export default function Entrance() {
 
   return (
     <div className={`entrance ${result?.kind ?? "idle"}`}>
-      <Link to="/staff" className="entrance-exit">
+      <Link to="/staff" className="entrance-exit" onClick={stopEntranceNfc}>
         ← персонал
       </Link>
       {!result && (
         <div className="entrance-box">
           <div className="entrance-logo">коко клуб</div>
-          <div className="entrance-title">Приложите карту</div>
-          <div className="entrance-pulse" />
-          <button className="btn" onClick={nfc.scanning ? nfc.stop : showGuest}>
-            {nfc.scanning ? "Отменить считывание" : "Посмотреть гостя по NFC"}
-          </button>
-          <div className="entrance-sub">
-            {nfc.scanning ? "Считывание включено — теперь приложите метку к телефону" : "На телефоне сначала нажмите кнопку, затем приложите метку"}
-          </div>
+          <div className="entrance-title">{nfc.status === "scanning" ? "Приложите карту" : "Считайте карту"}</div>
+          <button className="btn" onClick={toggleScan}>{nfc.status === "scanning" ? "Остановить считывание" : "Считать метку телефоном"}</button>
+          <div className="entrance-sub" role="status">{nfc.status === "scanning" ? "NFC включён — поднесите метку к телефону" : "Нажмите кнопку, затем поднесите метку"}</div>
           {nfc.error && <div className="error" role="alert">{nfc.error}</div>}
         </div>
       )}
@@ -73,7 +76,7 @@ export default function Entrance() {
       {result?.kind === "error" && (
         <div className="entrance-box">
           <div className="entrance-title">{result.text}</div>
-          <div className="entrance-sub">Подойдите, пожалуйста, на бар</div>
+          <button className="btn" onClick={toggleScan}>Повторить считывание</button>
         </div>
       )}
     </div>

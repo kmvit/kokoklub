@@ -1090,23 +1090,6 @@ a.list-row:hover {
   opacity: 0.8;
 }
 
-.entrance-pulse {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: pulse 1.8s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgb(224 168 46 / 60%);
-  }
-  100% {
-    box-shadow: 0 0 0 40px rgb(224 168 46 / 0%);
-  }
-}
-
 /* ─────────── Окно и тост ─────────── */
 .modal {
   position: fixed;
