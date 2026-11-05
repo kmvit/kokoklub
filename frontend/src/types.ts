@@ -33,6 +33,7 @@ export interface MemberDetail extends MemberShort {
 
 export interface Me {
   id: number;
+  email: string | null;
   phone: string;
   full_name: string;
   photo: string | null;

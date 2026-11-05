@@ -128,7 +128,7 @@ export default function Profile() {
               hidden
               onChange={(e) => e.target.files?.[0] && uploadPhoto(e.target.files[0])}
             />
-            <div className="muted small">Телефон: {formatPhone(me.phone)}</div>
+            <div className="muted small">Почта: {me.email || "не указана"} · Телефон: {formatPhone(me.phone)}</div>
           </div>
         </div>
 

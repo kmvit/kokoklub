@@ -8,7 +8,7 @@ interface AuthState {
   reload: () => Promise<Me | null>;
   setMe: (me: Me) => void;
   login: (tokens: { access: string; refresh: string }) => Promise<Me | null>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>(null as unknown as AuthState);
@@ -46,9 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [reload],
   );
 
-  const logout = useCallback(() => {
-    clearTokens();
-    setMe(null);
+  const logout = useCallback(async () => {
+    try { await api.post("/auth/logout/", {}); } finally {
+      clearTokens();
+      setMe(null);
+    }
   }, []);
 
   return (

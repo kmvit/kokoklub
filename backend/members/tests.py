@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from club.models import Card
 
-from .models import Activity, LoginCode, User
+from .models import Activity, User
 from .phone import normalize_phone
 
 
@@ -32,6 +32,7 @@ class BootstrapAdminTests(TestCase):
     def test_creates_admin_once_without_resetting_password(self):
         with mock.patch.dict("os.environ", {
             "BOOTSTRAP_ADMIN_PHONE": "89001234567",
+            "BOOTSTRAP_ADMIN_EMAIL": "admin@example.com",
             "BOOTSTRAP_ADMIN_PASSWORD": "long-unique-admin-password-2026",
         }):
             call_command("bootstrap_admin")
@@ -48,6 +49,7 @@ class BootstrapAdminTests(TestCase):
         User.objects.create_user("79001234567")
         with mock.patch.dict("os.environ", {
             "BOOTSTRAP_ADMIN_PHONE": "79001234567",
+            "BOOTSTRAP_ADMIN_EMAIL": "admin@example.com",
             "BOOTSTRAP_ADMIN_PASSWORD": "long-unique-admin-password-2026",
         }):
             with self.assertRaises(CommandError):
@@ -55,50 +57,42 @@ class BootstrapAdminTests(TestCase):
         self.assertFalse(User.objects.get(phone="79001234567").is_staff)
 
 
-class SmsLoginTests(TestCase):
+class EmailLoginTests(TestCase):
     def setUp(self):
         cache.clear()
         self.api = APIClient()
 
-    def _request_code(self, phone="+7 900 111-22-33"):
-        with mock.patch("members.auth.send_sms") as send, mock.patch("members.auth.secrets.randbelow", return_value=4321):
-            res = self.api.post("/api/auth/code/", {"phone": phone}, format="json")
-        return res, send
-
-    def test_code_login_creates_account(self):
-        res, send = self._request_code()
-        self.assertEqual(res.status_code, 200)
-        self.assertIn("4321", send.call_args.args[1])
-        res = self.api.post("/api/auth/verify/", {"phone": "89001112233", "code": "4321"}, format="json")
-        self.assertEqual(res.status_code, 200)
+    def test_register_and_login(self):
+        res = self.api.post("/api/auth/register/", {
+            "email": " Guest@Example.com ", "phone": "+7 900 111-22-33",
+            "password": "long-unique-member-password-2026", "consent": True,
+        }, format="json")
+        self.assertEqual(res.status_code, 201, res.data)
         self.assertIn("access", res.data)
-        self.assertTrue(User.objects.filter(phone="79001112233").exists())
-        # код одноразовый
-        res = self.api.post("/api/auth/verify/", {"phone": "89001112233", "code": "4321"}, format="json")
+        user = User.objects.get(phone="79001112233")
+        self.assertEqual(user.email, "guest@example.com")
+        self.assertIsNotNone(user.consent_at)
+        res = self.api.post("/api/auth/login/", {"email": "GUEST@example.com", "password": "long-unique-member-password-2026"}, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+
+    def test_registration_requires_phone_and_rejects_duplicate(self):
+        data = {"email": "guest@example.com", "password": "long-unique-member-password-2026", "consent": True}
+        self.assertEqual(self.api.post("/api/auth/register/", data, format="json").status_code, 400)
+        User.objects.create_user("79001112233")
+        self.assertEqual(self.api.post("/api/auth/register/", {**data, "phone": "89001112233"}, format="json").status_code, 400)
+
+    def test_wrong_password_is_rejected(self):
+        User.objects.create_user("79001112233", email="guest@example.com", password="long-unique-member-password-2026")
+        res = self.api.post("/api/auth/login/", {"email": "guest@example.com", "password": "wrong"}, format="json")
         self.assertEqual(res.status_code, 400)
 
-    def test_resend_throttled(self):
-        self._request_code()
-        res, send = self._request_code()
-        self.assertEqual(res.status_code, 429)
-        send.assert_not_called()
-
-    def test_wrong_code_attempts_limited(self):
-        self._request_code()
-        for _ in range(5):
-            res = self.api.post("/api/auth/verify/", {"phone": "79001112233", "code": "0000"}, format="json")
-            self.assertEqual(res.data["detail"], "Неверный код")
-        res = self.api.post("/api/auth/verify/", {"phone": "79001112233", "code": "4321"}, format="json")
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(LoginCode.objects.get().attempts, 5)
-
-    def test_staff_login_requires_staff(self):
-        User.objects.create_user("79005550000", password="secret-pass-1")
-        res = self.api.post("/api/auth/staff/", {"phone": "79005550000", "password": "secret-pass-1"}, format="json")
-        self.assertEqual(res.status_code, 400)
-        User.objects.filter(phone="79005550000").update(is_staff=True)
-        res = self.api.post("/api/auth/staff/", {"phone": "79005550000", "password": "secret-pass-1"}, format="json")
+    def test_staff_uses_same_login_and_admin_session(self):
+        User.objects.create_superuser("79005550000", email="admin@example.com", password="long-unique-admin-password-2026")
+        res = self.api.post("/api/auth/login/", {"email": "admin@example.com", "password": "long-unique-admin-password-2026"}, format="json")
         self.assertEqual(res.status_code, 200)
+        self.assertEqual(self.api.get("/admin/").status_code, 200)
+        self.api.post("/api/auth/logout/", {}, format="json")
+        self.assertEqual(self.api.get("/admin/").status_code, 302)
 
 
 class ProfileTests(TestCase):

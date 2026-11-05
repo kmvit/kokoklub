@@ -108,12 +108,12 @@ class MeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "id", "phone", "full_name", "photo", "activity", "occupation", "hobbies",
+            "id", "email", "phone", "full_name", "photo", "activity", "occupation", "hobbies",
             "about", "can_help", "looking_for", "telegram", "show_phone",
             "status", "status_text", "consent", "has_consent",
             "is_member", "in_club", "profile_complete", "is_staff", "is_hidden", "unread",
         ]
-        read_only_fields = ["phone", "is_staff", "is_hidden"]
+        read_only_fields = ["email", "phone", "is_staff", "is_hidden"]
 
     def get_photo(self, obj):
         return photo_url(obj)

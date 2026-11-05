@@ -29,7 +29,7 @@ function NewGuest({ onDone, onClose }: { onDone: (m: StaffMember) => void; onClo
   return (
     <Modal title="Новый гость" onClose={onClose}>
       <form className="form" onSubmit={submit}>
-        <p className="muted small">Для гостя без смартфона. Остальную анкету он заполнит сам, войдя по номеру.</p>
+        <p className="muted small">Для гостя без смартфона. Чтобы позже открыть ему вход, администратор добавит почту и пароль в его существующую учётную запись.</p>
         <label className="field">
           <span>Телефон</span>
           <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoFocus />

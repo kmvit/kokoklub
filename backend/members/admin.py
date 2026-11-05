@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django import forms
+from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.core.exceptions import ValidationError
@@ -15,11 +17,15 @@ def _clean_phone(form):
 
 
 class UserAddForm(UserCreationForm):
+    email = forms.EmailField(label="Электронная почта", required=True)
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = ["phone"]
+        fields = ["phone", "email"]
 
     clean_phone = _clean_phone
+
+    def clean_email(self):
+        return self.cleaned_data["email"].strip().lower()
 
 
 class UserEditForm(UserChangeForm):
@@ -29,18 +35,29 @@ class UserEditForm(UserChangeForm):
 
     clean_phone = _clean_phone
 
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+        return email.strip().lower() if email else None
+
+
+class EmailAdminAuthenticationForm(AdminAuthenticationForm):
+    username = forms.EmailField(label="Электронная почта", widget=forms.EmailInput(attrs={"autofocus": True}))
+
+
+admin.site.login_form = EmailAdminAuthenticationForm
+
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     form = UserEditForm
     add_form = UserAddForm
     ordering = ["-date_joined"]
-    list_display = ["phone", "full_name", "activity", "status", "is_hidden", "is_staff", "date_joined"]
+    list_display = ["email", "phone", "full_name", "activity", "status", "is_hidden", "is_staff", "date_joined"]
     list_filter = ["is_staff", "is_hidden", "status", "activity"]
-    search_fields = ["phone", "full_name", "occupation"]
+    search_fields = ["email", "phone", "full_name", "occupation"]
     filter_horizontal = ["hobbies", "groups", "user_permissions"]
     fieldsets = [
-        (None, {"fields": ["phone", "password"]}),
+        (None, {"fields": ["email", "phone", "password"]}),
         ("Анкета", {"fields": [
             "full_name", "photo", "activity", "occupation", "hobbies",
             "about", "can_help", "looking_for", "telegram", "show_phone", "consent_at",
@@ -48,7 +65,7 @@ class UserAdmin(BaseUserAdmin):
         ("Статус", {"fields": ["status", "status_text", "is_hidden"]}),
         ("Доступ", {"fields": ["is_active", "is_staff", "is_superuser", "groups", "user_permissions"]}),
     ]
-    add_fieldsets = [(None, {"classes": ["wide"], "fields": ["phone", "password1", "password2", "is_staff"]})]
+    add_fieldsets = [(None, {"classes": ["wide"], "fields": ["email", "phone", "password1", "password2", "is_staff"]})]
 
 
 @admin.register(Activity)

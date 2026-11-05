@@ -1,5 +1,5 @@
 // Тонкая обёртка над fetch: JWT в localStorage и тихое обновление
-// access-токена по refresh при 401 (участник входит по SMS один раз).
+// access-токена по refresh при 401.
 const ACCESS_KEY = "koko_access";
 const REFRESH_KEY = "koko_refresh";
 

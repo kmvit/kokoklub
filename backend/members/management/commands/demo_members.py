@@ -23,6 +23,7 @@ PEOPLE = [
 
 # Учётка персонала для локальной проверки экранов /staff. Только для разработки.
 DEMO_STAFF_PHONE = "79990000001"
+DEMO_STAFF_EMAIL = "staff-demo@example.com"
 DEMO_STAFF_PASSWORD = "koko-demo-staff"
 
 
@@ -56,7 +57,8 @@ class Command(BaseCommand):
         if not opts["no_staff"]:
             staff = User.objects.filter(phone=DEMO_STAFF_PHONE).first() or User.objects.create_user(DEMO_STAFF_PHONE)
             staff.is_staff = True
+            staff.email = DEMO_STAFF_EMAIL
             staff.set_password(DEMO_STAFF_PASSWORD)
             staff.save()
-            done += f"; персонал {DEMO_STAFF_PHONE} / {DEMO_STAFF_PASSWORD}"
+            done += f"; персонал {DEMO_STAFF_EMAIL} / {DEMO_STAFF_PASSWORD}"
         self.stdout.write(self.style.SUCCESS(done))

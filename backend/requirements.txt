@@ -6,5 +6,3 @@ psycopg[binary]==3.2.1
 Pillow==10.4.0
 python-dotenv==1.0.1
 gunicorn==22.0.0
-# Отправка кодов входа через SMS.ru (members/sms.py)
-httpx==0.28.1

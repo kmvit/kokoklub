@@ -15,14 +15,13 @@ import Guests from "./pages/staff/Guests";
 import GuestDetail from "./pages/staff/GuestDetail";
 import BindCard from "./pages/staff/BindCard";
 import StaffLayout from "./pages/staff/StaffLayout";
-import StaffLogin from "./pages/staff/StaffLogin";
 
 function RequireAuth({ children, staff = false }: { children: ReactNode; staff?: boolean }) {
   const { me, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="page-loading">Загрузка…</div>;
   if (!me || (staff && !me.is_staff)) {
-    return <Navigate to={staff ? "/staff/login" : "/login"} state={{ from: location.pathname }} replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
   return <>{children}</>;
 }
@@ -38,7 +37,7 @@ export default function App() {
         <Route path="me" element={<RequireAuth><Profile /></RequireAuth>} />
         <Route path="messages" element={<RequireAuth><Chats /></RequireAuth>} />
         <Route path="messages/:id" element={<RequireAuth><Chat /></RequireAuth>} />
-        <Route path="staff/login" element={<StaffLogin />} />
+        <Route path="staff/login" element={<Navigate to="/login" replace />} />
         <Route path="staff" element={<RequireAuth staff><StaffLayout /></RequireAuth>}>
           <Route index element={<Inside />} />
           <Route path="guests" element={<Guests />} />

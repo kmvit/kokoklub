@@ -36,7 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
-    # участники клуба: профиль, анкета, вход по SMS
+    # участники клуба: профиль, анкета, вход по почте и паролю
     "members",
     # клубные карты (NFC) и визиты
     "club",
@@ -112,8 +112,9 @@ else:
         }
     }
 
-# Учётная запись — это участник клуба, логин — номер телефона.
+# Учётная запись — участник клуба; телефон хранится для карты, вход по почте.
 AUTH_USER_MODEL = "members.User"
+AUTHENTICATION_BACKENDS = ["members.backends.EmailBackend"]
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -160,7 +161,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    # Участник заходит по SMS — каждое SMS стоит денег, поэтому refresh живёт
+    # Долгая сессия сайта с обновлением access-токена.
     # долго: гость входит один раз и остаётся в кабинете на телефоне.
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=180),
@@ -174,12 +175,6 @@ if ON_VERCEL:
     CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
-
-# ─────────── SMS для входа ───────────
-# console — код пишется в лог (разработка), smsru — отправка через sms.ru.
-SMS_BACKEND = os.getenv("SMS_BACKEND", "console")
-SMSRU_API_ID = os.getenv("SMSRU_API_ID", "")
-SMS_SENDER = os.getenv("SMS_SENDER", "")
 
 # ─────────── Клуб ───────────
 # Бар клуба работает в Падаче: пункт «Меню» в портале ведёт на страницу

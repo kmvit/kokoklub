@@ -1,4 +1,4 @@
-"""Участник клуба — он же учётная запись. Вход по номеру телефона."""
+"""Участник клуба — он же учётная запись. Вход по почте и паролю."""
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.db import models
@@ -11,16 +11,21 @@ class UserManager(BaseUserManager):
     use_in_migrations = True
 
     def create_user(self, phone, password=None, **extra):
-        user = self.model(phone=normalize_phone(phone), **extra)
+        email = extra.pop("email", None)
+        if email:
+            email = email.strip().lower()
+        user = self.model(phone=normalize_phone(phone), email=email, **extra)
         if password:
             user.set_password(password)
         else:
-            # участники входят по SMS-коду, пароль есть только у персонала
+            # анкету без входа может завести персонал
             user.set_unusable_password()
         user.save(using=self._db)
         return user
 
     def create_superuser(self, phone, password=None, **extra):
+        if not extra.get("email"):
+            raise ValueError("Для администратора нужна электронная почта")
         extra.setdefault("is_staff", True)
         extra.setdefault("is_superuser", True)
         return self.create_user(phone, password, **extra)
@@ -67,6 +72,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         DND = "dnd", "Не беспокоить"
 
     phone = models.CharField("телефон", max_length=11, unique=True)
+    email = models.EmailField("электронная почта", unique=True, null=True, blank=True)
     full_name = models.CharField("ФИО", max_length=150, blank=True)
     photo = models.ImageField("фото", upload_to="photos/", blank=True)
     activity = models.ForeignKey(
@@ -96,7 +102,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = "phone"
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ["email"]
 
     class Meta:
         verbose_name = "участник"
@@ -113,13 +119,3 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def profile_complete(self) -> bool:
         return bool(self.full_name and self.consent_at)
-
-
-class LoginCode(models.Model):
-    """Одноразовый код из SMS. Храним только хеш."""
-
-    phone = models.CharField(max_length=11, db_index=True)
-    code_hash = models.CharField(max_length=64)
-    created_at = models.DateTimeField(default=timezone.now)
-    attempts = models.PositiveSmallIntegerField(default=0)
-    used = models.BooleanField(default=False)
