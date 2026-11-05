@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../api";
-import { Avatar, StatusLine, useToast } from "../../components/ui";
+import { StatusLine, useToast } from "../../components/ui";
 import { formatPhone, formatTime, type InsideVisit } from "../../types";
 import { useCardReader } from "../../useCardReader";
+import StaffPhoto from "./StaffPhoto";
 
 // Планшет на баре: кто сейчас в клубе. Ридер можно подключить и сюда —
 // тогда карта, приложенная на баре, тоже отмечает вход и выход.
@@ -48,21 +49,21 @@ export default function Inside() {
         <div className="grid">
           {visits.map((v) => (
             <div key={v.id} className="card inside-card">
-              <div className="member-card-top">
-                <Avatar name={v.member.full_name} photo={v.member.photo} size={64} />
+              <StaffPhoto name={v.member.full_name || "Гость"} photo={v.member.photo} />
+              <div className="inside-card-body">
                 <div className="member-card-name">
                   <strong>{v.member.full_name || formatPhone(v.member.phone)}</strong>
                   <span className="muted">{v.member.occupation || v.member.activity}</span>
                 </div>
-              </div>
-              <StatusLine status={v.member.status} text={v.member.status_text} />
-              <div className="inside-foot">
-                <span className="muted small">
-                  с {formatTime(v.entered_at)} · {formatPhone(v.member.phone)}
-                </span>
-                <button className="link" onClick={() => leave(v)}>
-                  Отметить выход
-                </button>
+                <StatusLine status={v.member.status} text={v.member.status_text} />
+                <div className="inside-foot">
+                  <span className="muted small">
+                    с {formatTime(v.entered_at)} · {formatPhone(v.member.phone)}
+                  </span>
+                  <button className="link" onClick={() => leave(v)}>
+                    Отметить выход
+                  </button>
+                </div>
               </div>
             </div>
           ))}

@@ -3,17 +3,17 @@ import { beginEntranceNfc } from "../../entranceNfc";
 
 export default function StaffLayout() {
   return (
-    <div className="page">
-      <div className="staff-tabs">
+    <div className="page staff-page">
+      <nav className="staff-tabs" aria-label="Разделы персонала">
         <NavLink to="/staff" end>
-          Кто в клубе
+          <span className="staff-tab-desktop">Кто в клубе</span><span className="staff-tab-mobile">В клубе</span>
         </NavLink>
-        <NavLink to="/staff/guests">Гости и карты</NavLink>
-        <NavLink to="/staff/bind">Привязать карту</NavLink>
+        <NavLink to="/staff/guests"><span className="staff-tab-desktop">Гости и карты</span><span className="staff-tab-mobile">Гости</span></NavLink>
+        <NavLink to="/staff/bind"><span className="staff-tab-desktop">Привязать карту</span><span className="staff-tab-mobile">Карта</span></NavLink>
         <Link to="/staff/entrance" className="staff-entrance-link" onClick={beginEntranceNfc}>
-          Экран у входа ↗
+          <span className="staff-tab-desktop">Экран у входа ↗</span><span className="staff-tab-mobile">Вход</span>
         </Link>
-      </div>
+      </nav>
       <Outlet />
     </div>
   );
