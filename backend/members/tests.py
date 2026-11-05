@@ -94,6 +94,15 @@ class EmailLoginTests(TestCase):
         self.api.post("/api/auth/logout/", {}, format="json")
         self.assertEqual(self.api.get("/admin/").status_code, 302)
 
+    def test_admin_login_accepts_full_email_address(self):
+        response = self.client.get("/admin/login/")
+        self.assertContains(response, 'name="username" autofocus maxlength="254"')
+        User.objects.create_superuser("79005550000", email="justscoundrel@yandex.ru", password="long-unique-admin-password-2026")
+        response = self.client.post("/admin/login/", {
+            "username": "justscoundrel@yandex.ru", "password": "long-unique-admin-password-2026",
+        })
+        self.assertEqual(response.status_code, 302)
+
 
 class ProfileTests(TestCase):
     def setUp(self):

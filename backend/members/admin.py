@@ -43,6 +43,13 @@ class UserEditForm(UserChangeForm):
 class EmailAdminAuthenticationForm(AdminAuthenticationForm):
     username = forms.EmailField(label="Электронная почта", widget=forms.EmailInput(attrs={"autofocus": True}))
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # AuthenticationForm берёт maxlength из USERNAME_FIELD (телефон, 11 символов).
+        self.username_field = User._meta.get_field("email")
+        self.fields["username"].max_length = 254
+        self.fields["username"].widget.attrs["maxlength"] = 254
+
 
 admin.site.login_form = EmailAdminAuthenticationForm
 
