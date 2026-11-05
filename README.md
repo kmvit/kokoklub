@@ -105,6 +105,24 @@ cd frontend && npm install && npm run dev
 «Суперпользователь» кассиру не нужен. `DEMO_MEMBERS=1` запускает `demo_members --no-staff`
 при каждой Production сборке и добавляет только тестовых участников, без кассира.
 
+## VPS
+
+Технический адрес: `https://b5971f2535c5.vps.myjino.ru/`. Исходники на сервере —
+`/opt/kokoklub`, Git-ветка `main`. Секреты находятся в `/opt/kokoklub/.env`, база — в
+Docker volume `kokoklub_pgdata`, загруженные фото — в `backend/media/`; в Git их нет.
+
+После отправки изменений в `main` обновление на VPS:
+
+```bash
+ssh -J vpn -p 49294 root@b5971f2535c5.vps.myjino.ru
+cd /opt/kokoklub
+bash deploy/update.sh
+```
+
+Скрипт делает `git pull`, собирает frontend в Node-контейнере, обновляет Django и Nginx.
+Администратор создаётся отдельно. Для реальных SMS в `.env` нужно настроить `SMS_BACKEND=smsru`
+и `SMSRU_API_ID`; пока коды выводятся только в журнал backend-контейнера.
+
 ## Что дальше
 
 - Свой дизайн клуба: всё оформление на токенах в начале `frontend/src/styles.css`.
