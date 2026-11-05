@@ -1,6 +1,8 @@
 from unittest import mock
 
 from django.core.cache import cache
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -24,6 +26,33 @@ class PhoneTests(TestCase):
             self.assertEqual(normalize_phone(raw), "79001234567")
         with self.assertRaises(ValueError):
             normalize_phone("12345")
+
+
+class BootstrapAdminTests(TestCase):
+    def test_creates_admin_once_without_resetting_password(self):
+        with mock.patch.dict("os.environ", {
+            "BOOTSTRAP_ADMIN_PHONE": "89001234567",
+            "BOOTSTRAP_ADMIN_PASSWORD": "long-unique-admin-password-2026",
+        }):
+            call_command("bootstrap_admin")
+            admin = User.objects.get(phone="79001234567")
+            self.assertTrue(admin.is_staff and admin.is_superuser)
+            self.assertTrue(admin.check_password("long-unique-admin-password-2026"))
+            admin.set_password("changed-after-first-login-2026")
+            admin.save(update_fields=["password"])
+            call_command("bootstrap_admin")
+            admin.refresh_from_db()
+            self.assertTrue(admin.check_password("changed-after-first-login-2026"))
+
+    def test_does_not_promote_existing_member(self):
+        User.objects.create_user("79001234567")
+        with mock.patch.dict("os.environ", {
+            "BOOTSTRAP_ADMIN_PHONE": "79001234567",
+            "BOOTSTRAP_ADMIN_PASSWORD": "long-unique-admin-password-2026",
+        }):
+            with self.assertRaises(CommandError):
+                call_command("bootstrap_admin")
+        self.assertFalse(User.objects.get(phone="79001234567").is_staff)
 
 
 class SmsLoginTests(TestCase):
