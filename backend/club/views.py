@@ -87,6 +87,10 @@ class StaffMembersView(APIView):
 class StaffMemberView(APIView):
     permission_classes = [IsAdminUser]
 
+    def get(self, request, pk):
+        member = get_object_or_404(User, pk=pk, is_staff=False)
+        return Response(_member_data(member.pk))
+
     def patch(self, request, pk):
         """Модерация: скрыть из каталога или вернуть."""
         member = get_object_or_404(User, pk=pk)
@@ -101,7 +105,7 @@ class MemberCardView(APIView):
 
     def post(self, request, pk):
         """Привязать карту. Прежняя карта участника (потерял) отвязывается."""
-        member = get_object_or_404(User, pk=pk)
+        member = get_object_or_404(User, pk=pk, is_staff=False)
         try:
             uid = normalize_uid(request.data.get("uid", ""))
         except ValueError as e:
@@ -128,7 +132,7 @@ class MemberCardView(APIView):
         return Response(_member_data(member.pk))
 
     def delete(self, request, pk):
-        member = get_object_or_404(User, pk=pk)
+        member = get_object_or_404(User, pk=pk, is_staff=False)
         Card.objects.filter(member=member, is_active=True).update(is_active=False, revoked_at=timezone.now())
         return Response(_member_data(member.pk))
 
@@ -166,6 +170,22 @@ class ScanView(APIView):
                 visit = Visit.objects.create(member=member, card=card)
                 action = "enter"
         return Response({"action": action, **_visit_data(visit)})
+
+
+class CardLookupView(APIView):
+    """Поиск гостя по UID без изменения отметки входа или выхода."""
+
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        try:
+            uid = normalize_uid(request.data.get("uid", ""))
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=400)
+        card = Card.objects.filter(uid=uid, is_active=True, member__is_staff=False).first()
+        if not card:
+            return Response({"detail": "Карта не привязана ни к одному гостю"}, status=404)
+        return Response(_member_data(card.member_id))
 
 
 class InsideView(APIView):

@@ -1,67 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { Avatar, Modal, useToast } from "../../components/ui";
 import { formatPhone, type StaffMember } from "../../types";
-import { useCardReader } from "../../useCardReader";
+import { useNfcReader } from "../../useNfcReader";
 
 function cardState(m: StaffMember) {
   if (m.card) return <span className="pill ok">карта {m.card.uid}</span>;
   if (!m.profile_complete) return <span className="pill">анкета не заполнена</span>;
   return <span className="pill warn">ждёт карту</span>;
-}
-
-// Привязка карты: бариста пробил карту в кассе, гость прикладывает её к ридеру.
-function BindCard({ member, onDone, onClose }: { member: StaffMember; onDone: (m: StaffMember) => void; onClose: () => void }) {
-  const [manual, setManual] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const bind = useCallback(
-    async (uid: string) => {
-      setBusy(true);
-      setError("");
-      try {
-        onDone(await api.post<StaffMember>(`/staff/members/${member.id}/card/`, { uid }));
-      } catch (e) {
-        setError((e as Error).message);
-        setBusy(false);
-      }
-    },
-    [member.id, onDone],
-  );
-  useCardReader(bind, !busy);
-
-  return (
-    <Modal title={member.card ? "Перевыпуск карты" : "Выдача клубной карты"} onClose={onClose}>
-      <p>
-        <strong>{member.full_name || formatPhone(member.phone)}</strong>
-      </p>
-      <ol className="steps">
-        <li>Пробейте в кассе «Клубная карта — 1 500 ₽».</li>
-        <li>Приложите новую карту к ридеру.</li>
-      </ol>
-      {member.card && <p className="muted small">Старая карта {member.card.uid} перестанет работать.</p>}
-      <div className="scan-wait">{busy ? "Привязываем…" : "Ждём карту…"}</div>
-      {error && <div className="error">{error}</div>}
-      <form
-        className="manual-uid"
-        onSubmit={(e) => {
-          e.preventDefault();
-          bind(manual);
-        }}
-      >
-        <input
-          className="input"
-          placeholder="или номер вручную: 53:FB:51:19:23:00:01"
-          value={manual}
-          onChange={(e) => setManual(e.target.value)}
-        />
-        <button className="btn btn-ghost" disabled={busy || !manual.trim()}>
-          Привязать
-        </button>
-      </form>
-    </Modal>
-  );
 }
 
 function NewGuest({ onDone, onClose }: { onDone: (m: StaffMember) => void; onClose: () => void }) {
@@ -106,11 +53,25 @@ function NewGuest({ onDone, onClose }: { onDone: (m: StaffMember) => void; onClo
 
 export default function Guests() {
   const notify = useToast();
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [list, setList] = useState<StaffMember[] | null>(null);
-  const [binding, setBinding] = useState<StaffMember | null>(null);
   const [revoking, setRevoking] = useState<StaffMember | null>(null);
   const [creating, setCreating] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const nfc = useNfcReader();
+
+  const startScan = async () => {
+    setScanError("");
+    await nfc.start(async (serialNumber) => {
+      try {
+        const member = await api.post<StaffMember>("/staff/card-lookup/", { uid: serialNumber });
+        navigate(`/staff/guests/${member.id}`);
+      } catch (e) {
+        setScanError((e as Error).message);
+      }
+    });
+  };
 
   const load = useCallback(() => {
     api
@@ -146,10 +107,15 @@ export default function Guests() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <button className="btn" onClick={() => setCreating(true)}>
+        <button className="btn" onClick={nfc.scanning ? nfc.stop : startScan}>
+          {nfc.scanning ? "Отменить считывание" : "Посмотреть гостя по NFC"}
+        </button>
+        <button className="btn btn-ghost" onClick={() => setCreating(true)}>
           + Новый гость
         </button>
       </div>
+      {nfc.scanning && <div className="scan-wait" role="status">Приложите метку к телефону…</div>}
+      {(scanError || nfc.error) && <div className="error" role="alert">{scanError || nfc.error}</div>}
 
       {list === null ? (
         <div className="muted">Загрузка…</div>
@@ -170,9 +136,10 @@ export default function Guests() {
                 </div>
               </div>
               <div className="row-actions">
-                <button className="btn btn-small" onClick={() => setBinding(m)}>
+                <Link className="btn btn-small btn-ghost" to={`/staff/guests/${m.id}`}>Посмотреть</Link>
+                <Link className="btn btn-small" to={`/staff/bind?member=${m.id}`}>
                   {m.card ? "Перевыпустить" : "Выдать карту"}
-                </button>
+                </Link>
                 {m.card && (
                   <button className="link" onClick={() => setRevoking(m)}>
                     Отвязать
@@ -187,24 +154,13 @@ export default function Guests() {
         </div>
       )}
 
-      {binding && (
-        <BindCard
-          member={binding}
-          onClose={() => setBinding(null)}
-          onDone={(m) => {
-            replace(m);
-            setBinding(null);
-            notify(`Карта привязана: ${m.full_name || formatPhone(m.phone)}`, "ok");
-          }}
-        />
-      )}
       {creating && (
         <NewGuest
           onClose={() => setCreating(false)}
           onDone={(m) => {
             replace(m);
             setCreating(false);
-            setBinding(m);
+            navigate(`/staff/bind?member=${m.id}`);
           }}
         />
       )}

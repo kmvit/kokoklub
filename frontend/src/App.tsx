@@ -12,6 +12,8 @@ import Profile from "./pages/Profile";
 import Entrance from "./pages/staff/Entrance";
 import Inside from "./pages/staff/Inside";
 import Guests from "./pages/staff/Guests";
+import GuestDetail from "./pages/staff/GuestDetail";
+import BindCard from "./pages/staff/BindCard";
 import StaffLayout from "./pages/staff/StaffLayout";
 import StaffLogin from "./pages/staff/StaffLogin";
 
@@ -40,6 +42,8 @@ export default function App() {
         <Route path="staff" element={<RequireAuth staff><StaffLayout /></RequireAuth>}>
           <Route index element={<Inside />} />
           <Route path="guests" element={<Guests />} />
+          <Route path="guests/:id" element={<GuestDetail />} />
+          <Route path="bind" element={<BindCard />} />
         </Route>
       </Route>
       {/* экран у входа — на весь экран, без шапки портала */}

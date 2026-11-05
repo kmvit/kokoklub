@@ -37,6 +37,7 @@ class StaffTests(TestCase):
         res = self.api.post(f"/api/staff/members/{self.guest.pk}/card/", {"uid": "53FB5119230002"}, format="json")
         self.assertEqual(res.data["card"]["uid"], "53FB5119230002")
         self.assertEqual(Card.objects.filter(member=self.guest, is_active=True).count(), 1)
+        self.assertFalse(Card.objects.get(member=self.guest, uid="53FB5119230001").is_active)
 
     def test_card_of_another_member_rejected(self):
         other = User.objects.create_user("79001112244")
@@ -56,6 +57,27 @@ class StaffTests(TestCase):
     def test_unknown_card(self):
         res = self.api.post("/api/staff/scan/", {"uid": "53FB5119230009"}, format="json")
         self.assertEqual(res.status_code, 404)
+
+    def test_card_lookup_does_not_change_visit(self):
+        card = Card.objects.create(member=self.guest, uid="53FB5119230001")
+        visit = Visit.objects.create(member=self.guest, card=card)
+        res = self.api.post("/api/staff/card-lookup/", {"uid": "53:fb:51:19:23:00:01"}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["id"], self.guest.pk)
+        self.assertTrue(res.data["in_club"])
+        visit.refresh_from_db()
+        self.assertIsNone(visit.left_at)
+        self.assertEqual(self.api.get(f"/api/staff/members/{self.guest.pk}/").data["id"], self.guest.pk)
+
+    def test_card_lookup_requires_staff_and_active_card(self):
+        card = Card.objects.create(member=self.guest, uid="53FB5119230001", is_active=False)
+        self.assertEqual(self.api.post("/api/staff/card-lookup/", {"uid": card.uid}, format="json").status_code, 404)
+        card.is_active = True
+        card.save(update_fields=["is_active"])
+        api = APIClient()
+        api.force_authenticate(self.guest)
+        self.assertEqual(api.post("/api/staff/card-lookup/", {"uid": card.uid}, format="json").status_code, 403)
+        self.assertEqual(api.get(f"/api/staff/members/{self.guest.pk}/").status_code, 403)
 
     def test_yesterday_visit_not_inside(self):
         card = Card.objects.create(member=self.guest, uid="53FB5119230001")

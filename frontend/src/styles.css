@@ -950,6 +950,30 @@ a.list-row:hover {
   margin-bottom: 16px;
 }
 
+.staff-guest-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  margin-top: 20px;
+  padding: 24px;
+}
+
+.staff-guest-detail h1 { margin-bottom: 12px; }
+
+.bind-page { max-width: 680px; }
+.bind-page > p { margin: 20px 0 12px; }
+.bind-results { margin-top: 12px; }
+.bind-result { width: 100%; color: inherit; background: transparent; border: 0; text-align: left; font: inherit; cursor: pointer; }
+.bind-result:hover { background: var(--surface-2); }
+.bind-result-arrow { margin-left: auto; color: var(--accent); }
+.bind-selected { display: flex; align-items: center; gap: 16px; padding: 16px; margin: 20px 0; }
+.bind-selected .link { margin-left: auto; }
+.bind-confirm { margin-top: 20px; }
+.bind-confirm .btn { margin-top: 12px; }
+.bind-success { padding: 24px; margin-top: 24px; }
+.bind-success h2 { margin-top: 0; }
+.bind-success-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
 .row-actions {
   display: flex;
   align-items: center;
@@ -1223,6 +1247,11 @@ a.list-row:hover {
   .guests-head {
     flex-direction: column;
   }
+
+  .staff-guest-detail { flex-direction: column; }
+
+  .bind-selected { flex-wrap: wrap; }
+  .bind-selected .link { margin-left: 0; }
 
   .bubble {
     max-width: 88%;

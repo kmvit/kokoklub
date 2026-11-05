@@ -8,6 +8,7 @@ export default function StaffLayout() {
           Кто в клубе
         </NavLink>
         <NavLink to="/staff/guests">Гости и карты</NavLink>
+        <NavLink to="/staff/bind">Привязать карту</NavLink>
         <Link to="/staff/entrance" className="staff-entrance-link">
           Экран у входа ↗
         </Link>
