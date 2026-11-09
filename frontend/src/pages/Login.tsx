@@ -32,7 +32,7 @@ export default function Login() {
         : await api.post<Tokens>("/auth/login/", { email, password });
       const me = await login(tokens);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && (!from.startsWith("/staff") || me?.is_staff) ? from : me?.is_staff ? "/staff" : me && !me.profile_complete ? "/me" : "/people", { replace: true });
+      navigate(me && !me.is_staff && !me.profile_complete ? "/me" : from && (!from.startsWith("/staff") || me?.is_staff) ? from : me?.is_staff ? "/staff" : "/people", { replace: true });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -43,6 +43,7 @@ export default function Login() {
   return (
     <div className="page narrow-sm">
       <div className="card auth-card">
+        <p className="eyebrow">Коко клуб / Свои рядом</p>
         <h1>{register ? "Регистрация в клубе" : "Вход в клуб"}</h1>
         <p className="muted">{register ? "Создайте учётную запись. Телефон нужен для клубной карты." : "Один вход для участников, кассиров и администратора."}</p>
         <form onSubmit={submit}>

@@ -50,8 +50,6 @@ function StatusMenu() {
 export default function Layout() {
   const { me, reload } = useAuth();
   const pathname = useLocation().pathname;
-  const landing = pathname === "/";
-  const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // бар клуба живёт в Падаче — ссылка на меню приходит из настроек бэкенда
   const [menuUrl, setMenuUrl] = useState<string | null>(null);
@@ -76,28 +74,24 @@ export default function Layout() {
     return () => document.removeEventListener("visibilitychange", onFocus);
   }, [reload]);
 
-  // на лендинге шапка прозрачная, пока не начали листать
-  useEffect(() => {
-    if (!landing) return;
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [landing]);
-
   return (
-    <div className={`app ${landing ? "app-landing" : ""}`}>
-      <header className={`header ${scrolled ? "scrolled" : ""}`}>
+    <div className="app">
+      <a href="#main-content" className="skip-link">Перейти к содержимому</a>
+      <header className="header">
         <div className="header-inner">
           <Link to="/" className="logo">
             коко<span>клуб</span>
           </Link>
           <nav className={`nav ${mobileMenuOpen ? "nav-open" : ""}`} id="site-navigation" aria-label="Основная навигация" onClick={() => setMobileMenuOpen(false)}>
             <NavLink to="/" end>
-              Клуб
+              Афиша
             </NavLink>
-            <NavLink to="/people">Участники</NavLink>
-            {menuUrl && <a href={menuUrl}>Меню</a>}
+            {me && <>
+              <NavLink to="/people">Картотека</NavLink>
+              <NavLink to="/projects">Проекты</NavLink>
+              <NavLink to="/me">Личный кабинет</NavLink>
+              {menuUrl && <a href={menuUrl}>Меню</a>}
+            </>}
             {me && (
               <NavLink to="/messages">
                 Сообщения
@@ -114,7 +108,7 @@ export default function Layout() {
               </Link>
             ) : (
               <Link to="/login" className="btn btn-small">
-                Войти
+                Регистрация / Войти
               </Link>
             )}
           </div>
@@ -130,9 +124,10 @@ export default function Layout() {
           </button>
         </div>
       </header>
-      <main className={landing ? "main main-full" : "main"}>
+      <main className="main" id="main-content">
         <Outlet />
       </main>
+      <footer className="club-footer"><Link to="/" className="footer-logo">коко<span>клуб</span></Link><p>Хорошо, когда есть свои.</p><span>Люди. Идеи. Встречи.</span></footer>
     </div>
   );
 }

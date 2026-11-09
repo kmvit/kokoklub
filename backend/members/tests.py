@@ -131,24 +131,109 @@ class CatalogTests(TestCase):
     def setUp(self):
         self.api = APIClient()
 
-    def test_only_members_with_card_visible(self):
+    def test_guests_cannot_read_profiles(self):
+        target = make_member()
+        for path in ["/api/members/", f"/api/members/{target.pk}/", "/api/projects/", "/api/me/account/"]:
+            self.assertEqual(self.api.get(path).status_code, 401)
+
+    def test_registered_profiles_visible_without_card(self):
         visible = make_member("79001110001", "С картой")
-        make_member("79001110002", "Без карты", card=False)
+        no_card = make_member("79001110002", "Без карты", card=False)
         make_member("79001110003", "Скрытый", is_hidden=True)
+        self.api.force_authenticate(no_card)
         res = self.api.get("/api/members/")
-        self.assertEqual([m["id"] for m in res.data], [visible.pk])
+        self.assertCountEqual([m["id"] for m in res.data], [visible.pk, no_card.pk])
 
     def test_contacts_only_for_members(self):
         target = make_member("79001110001", "Цель", telegram="target", show_phone=True)
         res = self.api.get(f"/api/members/{target.pk}/")
-        self.assertIsNone(res.data["contacts"])
-        self.api.force_authenticate(make_member("79001110002", "Член клуба"))
+        self.assertEqual(res.status_code, 401)
+        self.api.force_authenticate(make_member("79001110002", "Член клуба", card=False))
         res = self.api.get(f"/api/members/{target.pk}/")
         self.assertEqual(res.data["contacts"], {"phone": "+79001110001", "telegram": "target"})
 
     def test_filter_by_activity_and_search(self):
+        self.api.force_authenticate(make_member("79001110009", "Зритель", card=False))
         design = Activity.objects.get(name="Дизайн")
         a = make_member("79001110001", "Анна", activity=design, can_help="сделаю сайт")
         make_member("79001110002", "Борис")
         self.assertEqual([m["id"] for m in self.api.get(f"/api/members/?activity={design.pk}").data], [a.pk])
         self.assertEqual([m["id"] for m in self.api.get("/api/members/?q=сайт").data], [a.pk])
+
+
+class ClubStructureTests(TestCase):
+    def setUp(self):
+        self.api = APIClient()
+        self.member = make_member(card=False)
+        self.staff = User.objects.create_user("79001112234", is_staff=True)
+
+    def test_public_afisha_only_published_upcoming_events(self):
+        from datetime import timedelta
+        from .models import Event
+        now = timezone.now()
+        visible = Event.objects.create(title="Встреча", starts_at=now + timedelta(days=1), is_published=True)
+        Event.objects.create(title="Черновик", starts_at=now + timedelta(days=2))
+        Event.objects.create(title="Прошлое", starts_at=now - timedelta(days=1), is_published=True)
+        res = self.api.get("/api/events/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([event["id"] for event in res.data], [visible.pk])
+
+    def test_projects_saved_through_profile_and_hidden_with_owner(self):
+        self.api.force_authenticate(self.member)
+        payload = {"projects": [{"title": "Мастерская", "description": "Делаем мебель", "url": "https://example.com"}]}
+        res = self.api.patch("/api/me/", payload, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+        res = self.api.get("/api/projects/")
+        self.assertEqual(res.data[0]["owner"]["id"], self.member.pk)
+        self.assertEqual(res.data[0]["title"], "Мастерская")
+        self.member.is_hidden = True
+        self.member.save()
+        self.assertEqual(self.api.get("/api/projects/").data, [])
+        self.api.patch("/api/me/", {"projects": []}, format="json")
+        self.assertFalse(self.member.projects.exists())
+
+    def test_invalid_projects_leave_existing_profile_unchanged(self):
+        from .models import Project
+        Project.objects.create(owner=self.member, title="Оригинал")
+        self.api.force_authenticate(self.member)
+        res = self.api.patch("/api/me/", {"full_name": "Новое имя", "projects": [{"title": "X", "url": "javascript:alert(1)"}]}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.full_name, "Анна")
+        self.assertEqual(self.member.projects.get().title, "Оригинал")
+
+    def test_staff_cash_topup_is_idempotent_and_private(self):
+        from uuid import uuid4
+        from .models import TopUp
+        self.api.force_authenticate(self.staff)
+        Card.objects.create(member=self.member, uid="53FB5119230001")
+        lookup = self.api.post("/api/staff/card-lookup/", {"uid": "53:FB:51:19:23:00:01"}, format="json")
+        self.assertEqual(lookup.data["id"], self.member.pk)
+        self.assertEqual(lookup.data["balance"], "0.00")
+        payload = {"amount": "1500.50", "reference": str(uuid4()), "payment_received": True}
+        path = f"/api/staff/members/{self.member.pk}/topups/"
+        self.assertEqual(self.api.post(path, payload, format="json").status_code, 201)
+        self.assertEqual(self.api.post(path, payload, format="json").status_code, 200)
+        self.assertEqual(TopUp.objects.count(), 1)
+        self.assertEqual(self.api.post(path, {**payload, "amount": "2000"}, format="json").status_code, 409)
+        self.api.force_authenticate(self.member)
+        res = self.api.get("/api/me/account/")
+        self.assertEqual(res.data["balance"], "1500.50")
+        self.assertEqual(len(res.data["topups"]), 1)
+        self.assertEqual(self.api.post(path, payload, format="json").status_code, 403)
+        self.api.patch("/api/me/", {"balance": "999999"}, format="json")
+        self.assertEqual(self.api.get("/api/me/account/").data["balance"], "1500.50")
+        self.api.force_authenticate(make_member("79001112235", card=False))
+        self.assertEqual(self.api.get("/api/me/account/").data["balance"], "0.00")
+        self.assertEqual(self.api.get("/api/me/account/").data["topups"], [])
+
+    def test_topup_requires_valid_amount_and_cash_confirmation(self):
+        from uuid import uuid4
+        from .models import TopUp
+        self.api.force_authenticate(self.staff)
+        path = f"/api/staff/members/{self.member.pk}/topups/"
+        for amount in ["0", "-1", "NaN", "1.001", "1000001"]:
+            res = self.api.post(path, {"amount": amount, "reference": str(uuid4()), "payment_received": True}, format="json")
+            self.assertEqual(res.status_code, 400)
+        self.assertEqual(self.api.post(path, {"amount": "100", "reference": str(uuid4()), "payment_received": False}, format="json").status_code, 400)
+        self.assertFalse(TopUp.objects.exists())

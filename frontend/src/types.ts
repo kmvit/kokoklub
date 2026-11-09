@@ -24,6 +24,7 @@ export interface MemberShort {
 }
 
 export interface MemberDetail extends MemberShort {
+  projects: Project[];
   about: string;
   can_help: string;
   looking_for: string;
@@ -31,7 +32,15 @@ export interface MemberDetail extends MemberShort {
   member_since: string | null;
 }
 
+export interface Project {
+  id?: number;
+  title: string;
+  description: string;
+  url: string;
+}
+
 export interface Me {
+  projects: Project[];
   id: number;
   email: string | null;
   phone: string;
@@ -72,6 +81,7 @@ export interface ChatSummary {
 }
 
 export interface StaffMember {
+  balance: string;
   id: number;
   phone: string;
   full_name: string;

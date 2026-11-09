@@ -119,3 +119,48 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def profile_complete(self) -> bool:
         return bool(self.full_name and self.consent_at)
+
+
+class Project(models.Model):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
+    title = models.CharField("название", max_length=150)
+    description = models.TextField("описание", blank=True, max_length=5000)
+    url = models.URLField("ссылка", blank=True)
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = "проект"
+        verbose_name_plural = "проекты"
+
+
+class Event(models.Model):
+    title = models.CharField("название", max_length=150)
+    description = models.TextField("описание", blank=True)
+    starts_at = models.DateTimeField("начало")
+    location = models.CharField("место", max_length=200, blank=True)
+    is_published = models.BooleanField("опубликовано", default=False)
+
+    class Meta:
+        ordering = ["starts_at"]
+        verbose_name = "событие афиши"
+        verbose_name_plural = "афиша"
+
+
+class TopUp(models.Model):
+    member = models.ForeignKey(User, on_delete=models.PROTECT, related_name="topups")
+    amount = models.DecimalField("сумма, ₽", max_digits=10, decimal_places=2)
+    reference = models.UUIDField(unique=True, editable=False)
+    created_at = models.DateTimeField("дата", auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="credited_topups")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "пополнение счёта"
+        verbose_name_plural = "пополнения счетов"
+        constraints = [models.CheckConstraint(check=models.Q(amount__gt=0), name="topup_positive")]
+
+
+def account_balance(user):
+    from decimal import Decimal
+    from django.db.models import Sum
+    return user.topups.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")

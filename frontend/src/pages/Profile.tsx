@@ -2,16 +2,19 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { PageHeading } from "../components/ClubDesign";
+import Account from "../components/Account";
 import { Avatar, StatusDot, useToast } from "../components/ui";
 import { STATUS_LABEL, formatPhone, type Activity, type Me, type Status } from "../types";
 
 type Form = Pick<
   Me,
-  "full_name" | "activity" | "occupation" | "about" | "can_help" | "looking_for" | "telegram" | "show_phone" | "status" | "status_text"
+  "projects" | "full_name" | "activity" | "occupation" | "about" | "can_help" | "looking_for" | "telegram" | "show_phone" | "status" | "status_text"
 > & { hobbies: string };
 
 function toForm(me: Me): Form {
   return {
+    projects: me.projects,
     full_name: me.full_name,
     activity: me.activity,
     occupation: me.occupation,
@@ -34,20 +37,12 @@ function MembershipNotice({ me }: { me: Me }) {
       </div>
     );
   }
-  if (!me.is_member) {
-    return (
-      <div className="notice">
-        <strong>Анкета готова.</strong> Подойдите на бар и назовите номер телефона — вам выдадут клубную
-        карту, и профиль появится в каталоге.
-      </div>
-    );
-  }
   if (me.is_hidden) {
     return <div className="notice bad">Профиль скрыт из каталога администратором клуба.</div>;
   }
   return (
     <div className="notice ok">
-      Вы член клуба{me.in_club ? " и сейчас в клубе" : ""}.{" "}
+      Ваш профиль в картотеке{me.in_club ? " и сейчас в клубе" : ""}.{" "}
       <Link to={`/people/${me.id}`}>Как меня видят другие →</Link>
     </div>
   );
@@ -106,7 +101,9 @@ export default function Profile() {
 
   return (
     <div className="page narrow">
-      <h1>Мой профиль</h1>
+      <PageHeading eyebrow="Личный кабинет / мой клуб" title="Личный кабинет" description="Ваш счёт, профиль и идеи — в одном месте." />
+      <Account />
+      <h2>Моя анкета</h2>
       <MembershipNotice me={me} />
 
       <form className="card form" onSubmit={save}>
@@ -207,6 +204,21 @@ export default function Profile() {
               ))}
           </div>
         )}
+
+        <section>
+          <h2>Мои проекты</h2>
+          <p className="muted">После сохранения анкеты проекты появятся в разделе «Проекты» для участников клуба.</p>
+          {form.projects.map((project, index) => (
+            <fieldset className="project-editor" key={index}>
+              <legend>Проект {index + 1}</legend>
+              <label className="field"><span>Название *</span><input className="input" required maxLength={150} value={project.title} onChange={(e) => set("projects", form.projects.map((p, i) => i === index ? { ...p, title: e.target.value } : p))} /></label>
+              <label className="field"><span>Описание</span><textarea className="input" rows={3} maxLength={5000} value={project.description} onChange={(e) => set("projects", form.projects.map((p, i) => i === index ? { ...p, description: e.target.value } : p))} /></label>
+              <label className="field"><span>Ссылка</span><input className="input" type="url" maxLength={200} placeholder="https://" value={project.url} onChange={(e) => set("projects", form.projects.map((p, i) => i === index ? { ...p, url: e.target.value } : p))} /></label>
+              <button type="button" className="link" onClick={() => set("projects", form.projects.filter((_, i) => i !== index))}>Удалить проект</button>
+            </fieldset>
+          ))}
+          <button type="button" className="btn btn-ghost" disabled={form.projects.length >= 20} onClick={() => set("projects", [...form.projects, { title: "", description: "", url: "" }])}>Добавить проект</button>
+        </section>
 
         <h3>Статус</h3>
         <div className="chips">

@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from club.queries import with_club_flags
 
 from .images import shrink_photo
-from .models import Activity, Hobby, User
+from .models import Activity, Hobby, User, Project, Event, TopUp, account_balance
 from .serializers import (
     ActivitySerializer,
     MeSerializer,
@@ -19,14 +19,14 @@ from .serializers import (
 
 
 def catalog_queryset():
-    """Кого видно на портале: члены клуба с заполненной анкетой, не скрытые модератором."""
+    """Кого видно на портале: участники с заполненной анкетой, не скрытые модератором."""
     qs = (
         User.objects.filter(is_active=True, is_hidden=False, consent_at__isnull=False)
         .exclude(full_name="")
         .select_related("activity")
         .prefetch_related("hobbies")
     )
-    return with_club_flags(qs).filter(has_card=True)
+    return with_club_flags(qs)
 
 
 class MeView(generics.RetrieveUpdateAPIView):
@@ -79,8 +79,6 @@ class ActivityListView(generics.ListAPIView):
 class HobbyListView(APIView):
     """Популярные хобби — подсказки в анкете и фильтр каталога."""
 
-    permission_classes = [AllowAny]
-
     def get(self, request):
         names = (
             Hobby.objects.annotate(n=Count("members"))
@@ -92,9 +90,7 @@ class HobbyListView(APIView):
 
 
 class MemberListView(generics.ListAPIView):
-    """Каталог участников. Открыт всем, без входа."""
-
-    permission_classes = [AllowAny]
+    """Картотека доступна только вошедшим участникам."""
     serializer_class = MemberShortSerializer
     pagination_class = None
 
@@ -126,8 +122,36 @@ class MemberListView(generics.ListAPIView):
 
 
 class MemberDetailView(APIView):
-    permission_classes = [AllowAny]
 
     def get(self, request, pk):
         member = get_object_or_404(catalog_queryset(), pk=pk)
         return Response(MemberDetailSerializer(member, context={"request": request}).data)
+
+
+class EventsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from django.utils import timezone
+        return Response(list(Event.objects.filter(is_published=True, starts_at__gte=timezone.now()).values(
+            "id", "title", "description", "starts_at", "location",
+        )))
+
+
+class ProjectsView(APIView):
+    def get(self, request):
+        from .serializers import ProjectSerializer
+        projects = Project.objects.filter(owner__in=catalog_queryset()).select_related("owner")
+        return Response([
+            {**ProjectSerializer(p).data, "owner": {
+                "id": p.owner_id, "full_name": p.owner.full_name,
+            }} for p in projects
+        ])
+
+
+class AccountView(APIView):
+    def get(self, request):
+        return Response({
+            "balance": format(account_balance(request.user), ".2f"),
+            "topups": list(request.user.topups.values("id", "amount", "created_at")[:100]),
+        })

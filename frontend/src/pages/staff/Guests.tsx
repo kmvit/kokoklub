@@ -4,6 +4,7 @@ import { api } from "../../api";
 import { Modal, useToast } from "../../components/ui";
 import { formatPhone, type StaffMember } from "../../types";
 import { useNfcReader } from "../../useNfcReader";
+import { useCardReader } from "../../useCardReader";
 import StaffPhoto from "./StaffPhoto";
 
 function cardState(m: StaffMember) {
@@ -72,6 +73,13 @@ export default function Guests() {
       }
     });
   };
+
+  useCardReader(async (uid) => {
+    try {
+      const member = await api.post<StaffMember>("/staff/card-lookup/", { uid });
+      navigate(`/staff/guests/${member.id}`);
+    } catch (e) { setScanError((e as Error).message); }
+  }, !creating);
 
   const load = useCallback(() => {
     api

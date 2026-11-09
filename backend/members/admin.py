@@ -84,3 +84,26 @@ class ActivityAdmin(admin.ModelAdmin):
 @admin.register(Hobby)
 class HobbyAdmin(admin.ModelAdmin):
     search_fields = ["name"]
+
+
+from .models import Event, TopUp
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    list_display = ["title", "starts_at", "location", "is_published"]
+    list_filter = ["is_published"]
+
+
+@admin.register(TopUp)
+class TopUpAdmin(admin.ModelAdmin):
+    list_display = ["member", "amount", "created_by", "created_at"]
+    search_fields = ["member__full_name", "member__phone"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -25,14 +25,19 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     activity = serializers.CharField(source="activity.name", default=None, read_only=True)
     card = serializers.SerializerMethodField()
     in_club = serializers.BooleanField(read_only=True)
+    balance = serializers.SerializerMethodField()
     profile_complete = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
         fields = [
             "id", "phone", "full_name", "photo", "activity", "occupation",
-            "profile_complete", "is_hidden", "card", "in_club", "date_joined",
+            "profile_complete", "is_hidden", "card", "in_club", "date_joined", "balance",
         ]
+
+    def get_balance(self, obj):
+        from members.models import account_balance
+        return format(account_balance(obj), ".2f")
 
     def get_photo(self, obj):
         return photo_url(obj)
@@ -215,3 +220,34 @@ class LeaveView(APIView):
         visit.left_at = timezone.now()
         visit.save(update_fields=["left_at"])
         return Response({"ok": True})
+
+
+class StaffTopUpView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        from decimal import Decimal
+        from members.models import TopUp, account_balance
+
+        class Input(serializers.Serializer):
+            amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0.01"), max_value=Decimal("1000000"))
+            reference = serializers.UUIDField()
+            payment_received = serializers.BooleanField()
+
+        data = Input(data=request.data)
+        data.is_valid(raise_exception=True)
+        if not data.validated_data["payment_received"]:
+            return Response({"detail": "Сначала примите оплату на кассе"}, status=400)
+        with transaction.atomic():
+            member = get_object_or_404(User.objects.select_for_update(), pk=pk, is_staff=False, is_active=True)
+            try:
+                with transaction.atomic():
+                    topup, created = TopUp.objects.get_or_create(
+                        reference=data.validated_data["reference"],
+                        defaults={"member": member, "amount": data.validated_data["amount"], "created_by": request.user},
+                    )
+            except IntegrityError:
+                return Response({"detail": "Повторите запрос"}, status=409)
+            if topup.member_id != member.pk or topup.amount != data.validated_data["amount"] or topup.created_by_id != request.user.pk:
+                return Response({"detail": "Этот номер операции уже использован"}, status=409)
+            return Response({"id": topup.pk, "balance": format(account_balance(member), ".2f")}, status=201 if created else 200)

@@ -5,6 +5,7 @@ import App from "./App";
 import { AuthProvider } from "./auth";
 import { ToastProvider } from "./components/ui";
 import "./styles.css";
+import "./club-theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

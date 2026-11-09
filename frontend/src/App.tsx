@@ -6,7 +6,8 @@ import Layout from "./components/Layout";
 import Catalog from "./pages/Catalog";
 import Chat from "./pages/Chat";
 import Chats from "./pages/Chats";
-import Landing from "./pages/Landing";
+import Afisha from "./pages/Afisha";
+import Projects from "./pages/Projects";
 import Login from "./pages/Login";
 import Person from "./pages/Person";
 import Profile from "./pages/Profile";
@@ -39,9 +40,10 @@ export default function App() {
   return (
     <><EntranceScanBoundary /><Routes>
       <Route element={<Layout />}>
-        <Route index element={<Landing />} />
-        <Route path="people" element={<Catalog />} />
-        <Route path="people/:id" element={<Person />} />
+        <Route index element={<Afisha />} />
+        <Route path="projects" element={<RequireAuth><Projects /></RequireAuth>} />
+        <Route path="people" element={<RequireAuth><Catalog /></RequireAuth>} />
+        <Route path="people/:id" element={<RequireAuth><Person /></RequireAuth>} />
         <Route path="login" element={<Login />} />
         <Route path="me" element={<RequireAuth><Profile /></RequireAuth>} />
         <Route path="messages" element={<RequireAuth><Chats /></RequireAuth>} />

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { ClubEmpty, PageHeading } from "../components/ClubDesign";
 import { StatusDot } from "../components/ui";
 import { STATUS_LABEL, type Activity, type MemberShort } from "../types";
 
-// Каталог — только лица и имена. Всё остальное о человеке — в его профиле.
+// Карточка ведёт в профиль участника.
 function PersonTile({ m }: { m: MemberShort }) {
   const initials = m.full_name
     .split(" ")
@@ -20,7 +21,10 @@ function PersonTile({ m }: { m: MemberShort }) {
           <StatusDot status={m.status} />
         </span>
       </div>
-      <div className="person-name">{m.full_name}</div>
+      <div className="person-tile-info"><div className="person-name">{m.full_name}</div>
+        <p className="person-occupation">{m.occupation || m.activity || "Участник клуба"}</p>
+        <div className="person-tile-footer"><span>{m.in_club ? "Сейчас в клубе" : STATUS_LABEL[m.status]}</span><span className="person-arrow" aria-hidden="true">↗</span></div>
+      </div>
     </Link>
   );
 }
@@ -57,11 +61,11 @@ export default function Catalog() {
 
   return (
     <div className="page">
-      <h1>Участники клуба</h1>
+      <PageHeading eyebrow="Клуб в лицах / картотека" title="Картотека клубчан" description="У каждого — своя история. Найдите тех, с кем она продолжится." action={<Link to="/me" className="btn btn-ghost">Моя анкета <span aria-hidden="true">↗</span></Link>} />
 
       <div className="filters">
-        <input className="input search" placeholder="Поиск по имени или делу" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input" value={activity} onChange={(e) => setActivity(e.target.value)}>
+        <input className="input search" aria-label="Поиск по имени или делу" placeholder="Найти своего человека…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="input" aria-label="Вид деятельности" value={activity} onChange={(e) => setActivity(e.target.value)}>
           <option value="">Все виды деятельности</option>
           {activities.map((a) => (
             <option key={a.id} value={a.id}>
@@ -69,7 +73,7 @@ export default function Catalog() {
             </option>
           ))}
         </select>
-        <button className={`chip ${inClub ? "on" : ""}`} onClick={() => setInClub(!inClub)}>
+        <button className={`chip ${inClub ? "on" : ""}`} aria-pressed={inClub} onClick={() => setInClub(!inClub)}>
           Сейчас в клубе
         </button>
       </div>
@@ -78,13 +82,14 @@ export default function Catalog() {
       {members === null ? (
         <div className="muted">Загрузка…</div>
       ) : members.length === 0 ? (
-        <div className="empty">Никого не нашли.</div>
+        <ClubEmpty title="Пока никого не нашли."><p>Попробуйте другое имя или измените фильтры.</p></ClubEmpty>
       ) : (
-        <div className="people-grid">
+        <>
+        <p className="results-caption">В картотеке по вашему запросу: {members.length}</p><div className="people-grid">
           {members.map((m) => (
             <PersonTile key={m.id} m={m} />
           ))}
-        </div>
+        </div></>
       )}
     </div>
   );

@@ -1,12 +1,13 @@
 import re
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 
 from club.queries import open_visits
 
-from .models import Activity, Hobby, User
+from .models import Activity, Hobby, User, Project
 
 
 class HobbiesField(serializers.Field):
@@ -67,18 +68,22 @@ class MemberShortSerializer(serializers.ModelSerializer):
 
 
 class MemberDetailSerializer(MemberShortSerializer):
+    projects = serializers.SerializerMethodField()
     contacts = serializers.SerializerMethodField()
     member_since = serializers.SerializerMethodField()
 
     class Meta(MemberShortSerializer.Meta):
         fields = MemberShortSerializer.Meta.fields + [
-            "about", "can_help", "looking_for", "contacts", "member_since",
+            "about", "can_help", "looking_for", "contacts", "member_since", "projects",
         ]
 
+    def get_projects(self, obj):
+        return ProjectSerializer(obj.projects.all(), many=True).data
+
     def get_contacts(self, obj):
-        # Портал открыт всем, а контакты — только своим: членам клуба.
+        # Контакты доступны зарегистрированным участникам.
         viewer = self.context["request"].user
-        if not viewer.is_authenticated or not (viewer.is_member or viewer == obj):
+        if not viewer.is_authenticated:
             return None
         return {
             "phone": f"+{obj.phone}" if obj.show_phone else None,
@@ -90,9 +95,17 @@ class MemberDetailSerializer(MemberShortSerializer):
         return card.issued_at.date() if card else None
 
 
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ["id", "title", "description", "url"]
+        read_only_fields = ["id"]
+
+
 class MeSerializer(serializers.ModelSerializer):
     """Анкета и личный кабинет участника."""
 
+    projects = ProjectSerializer(many=True, required=False, max_length=20)
     hobbies = HobbiesField(required=False)
     activity = serializers.PrimaryKeyRelatedField(
         queryset=Activity.objects.all(), allow_null=True, required=False,
@@ -111,7 +124,7 @@ class MeSerializer(serializers.ModelSerializer):
             "id", "email", "phone", "full_name", "photo", "activity", "occupation", "hobbies",
             "about", "can_help", "looking_for", "telegram", "show_phone",
             "status", "status_text", "consent", "has_consent",
-            "is_member", "in_club", "profile_complete", "is_staff", "is_hidden", "unread",
+            "is_member", "in_club", "profile_complete", "is_staff", "is_hidden", "unread", "projects",
         ]
         read_only_fields = ["email", "phone", "is_staff", "is_hidden"]
 
@@ -159,11 +172,16 @@ class MeSerializer(serializers.ModelSerializer):
             )
         return attrs
 
+    @transaction.atomic
     def update(self, instance, validated):
+        projects = validated.pop("projects", None)
         hobbies = validated.pop("hobbies", None)
         if validated.pop("consent", False) and instance.consent_at is None:
             instance.consent_at = timezone.now()
         instance = super().update(instance, validated)
         if hobbies is not None:
             instance.hobbies.set([Hobby.objects.get_or_create(name=n)[0] for n in hobbies])
+        if projects is not None:
+            instance.projects.all().delete()
+            Project.objects.bulk_create([Project(owner=instance, **p) for p in projects])
         return instance
