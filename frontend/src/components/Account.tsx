@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 
 export const rubles = (value: string) => Number(value).toLocaleString("ru-RU", { style: "currency", currency: "RUB" });
 type AccountData = { balance: string; topups: { id: number; amount: string; created_at: string }[] };
-export default function Account() {
+export default function Account({ compact = false }: { compact?: boolean }) {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [error, setError] = useState("");
   const [showHelp, setShowHelp] = useState(false);
@@ -25,8 +26,8 @@ export default function Account() {
         {showHelp && <div className="notice">Подойдите к сотруднику клуба и приложите NFC-карту к ридеру. Назовите сумму и оплатите её на кассе. Сотрудник подтвердит пополнение, и деньги появятся на вашем счёте.</div>}
       </> : !error && <p className="muted">Загрузка счёта…</p>}
     </div>
-    <div className="account-history-panel"><h3>История пополнений</h3>
+    <div className="account-history-panel">{compact ? <Link className="link" to="/me">История пополнений →</Link> : <><h3>История пополнений</h3>
       {account && (account.topups.length === 0 ? <p className="muted">Пополнений пока нет.</p> : <ul className="account-history">{account.topups.map((item) => <li key={item.id}><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("ru-RU")}</time><strong>+{rubles(item.amount)}</strong></li>)}</ul>)}
-    </div>
+    </>}</div>
   </section>;
 }

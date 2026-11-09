@@ -205,3 +205,54 @@ body { line-height: 1.6; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Главная участника: картотека и проекты на одной странице с кабинетом справа. */
+.home-heading { padding: 12px 0 24px; }
+.home-heading h1 { font-size: clamp(36px, 4.8vw, 54px); margin: 16px 0; }
+.home-sections { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 28px; margin-bottom: 32px; border-bottom: 1px solid var(--line); }
+.home-sections a { display: flex; align-items: center; justify-content: space-between; gap: 28px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 16px; min-height: 44px; text-decoration: none; font-size: 14px; }
+.home-sections a:hover { border-color: var(--accent); }
+.home-sections a span { color: var(--accent); }
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 32px; align-items: start; }
+.home-feed, .home-sidebar { min-width: 0; }
+.home-section { margin-bottom: 48px; scroll-margin-top: 110px; }
+.home-section .section-heading { align-items: center; gap: 16px; }
+.home-section .section-heading h2 { font-size: clamp(28px, 3vw, 36px); line-height: 1.15; }
+.home-section .section-heading .eyebrow { font-size: 10px; letter-spacing: .1em; }
+.section-all { flex-shrink: 0; font-size: 12px; }
+.home-people-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.home-people-grid .person-tile-info { padding: 16px 14px 12px; }
+.home-people-grid .person-name { font-size: 20px; }
+.home-people-grid .person-occupation { font-size: 12px; }
+.home-project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.home-profile { padding: 24px; margin-bottom: 20px; }
+.home-profile .eyebrow { margin: 0 0 20px; font-size: 10px; }
+.home-profile h2 { font: 500 25px/1.2 var(--serif); margin: 16px 0 10px; overflow-wrap: anywhere; }
+.home-profile p.muted { font-size: 13px; margin: 0 0 20px; }
+.home-profile .btn { width: 100%; font-size: 13px; padding: 10px 12px; }
+.home-sidebar .member-account { margin-bottom: 20px; }
+.home-sidebar .balance-card, .home-sidebar .account-history-panel { padding: 20px; }
+.home-sidebar .balance-wordmark { font-size: 22px; }
+.home-sidebar .account-balance { font-size: 38px; overflow-wrap: anywhere; }
+.home-sidebar .balance-card .btn { width: 100%; font-size: 13px; padding: 12px; }
+.home-sidebar .account-history-panel .link { font-size: 12px; }
+.home-afisha-link { display: flex; flex-direction: column; position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 24px; background: var(--accent-soft); text-decoration: none; }
+.home-afisha-link .eyebrow { font-size: 10px; }
+.home-afisha-link strong { font: 500 27px/1.2 var(--serif); margin: 12px 0; }
+.home-afisha-link .muted { font-size: 12px; }
+.home-afisha-arrow { position: absolute; right: 20px; top: 24px; color: var(--accent); }
+@media (max-width: 1000px) {
+  .home-layout { grid-template-columns: minmax(0, 1fr) 250px; gap: 24px; }
+  .home-people-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-section .section-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
+}
+@media (max-width: 700px) {
+  .home-layout { grid-template-columns: 1fr; }
+  .home-sidebar { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .home-sidebar .home-profile, .home-sidebar .member-account { margin-bottom: 0; }
+  .home-project-grid { grid-template-columns: 1fr; }
+  .home-section { margin-bottom: 36px; }
+  .home-sections { gap: 8px; margin-bottom: 28px; }
+  .home-sections a { gap: 12px; padding: 10px 12px; font-size: 12px; }
+  .home-heading .page-description { font-size: 14px; }
+}

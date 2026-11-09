@@ -32,7 +32,7 @@ export default function Login() {
         : await api.post<Tokens>("/auth/login/", { email, password });
       const me = await login(tokens);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(me && !me.is_staff && !me.profile_complete ? "/me" : from && (!from.startsWith("/staff") || me?.is_staff) ? from : me?.is_staff ? "/staff" : "/people", { replace: true });
+      navigate(me && !me.is_staff && !me.profile_complete ? "/me" : from && (!from.startsWith("/staff") || me?.is_staff) ? from : me?.is_staff ? "/staff" : "/", { replace: true });
     } catch (err) {
       setError((err as Error).message);
     } finally {

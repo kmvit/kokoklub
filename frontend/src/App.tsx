@@ -6,6 +6,7 @@ import Layout from "./components/Layout";
 import Catalog from "./pages/Catalog";
 import Chat from "./pages/Chat";
 import Chats from "./pages/Chats";
+import Home from "./pages/Home";
 import Afisha from "./pages/Afisha";
 import Projects from "./pages/Projects";
 import Login from "./pages/Login";
@@ -40,7 +41,8 @@ export default function App() {
   return (
     <><EntranceScanBoundary /><Routes>
       <Route element={<Layout />}>
-        <Route index element={<Afisha />} />
+        <Route index element={<Home />} />
+        <Route path="afisha" element={<Afisha />} />
         <Route path="projects" element={<RequireAuth><Projects /></RequireAuth>} />
         <Route path="people" element={<RequireAuth><Catalog /></RequireAuth>} />
         <Route path="people/:id" element={<RequireAuth><Person /></RequireAuth>} />

@@ -39,6 +39,11 @@ export interface Project {
   url: string;
 }
 
+export interface ClubProject extends Project {
+  id: number;
+  owner: { id: number; full_name: string };
+}
+
 export interface Me {
   projects: Project[];
   id: number;

@@ -83,9 +83,8 @@ export default function Layout() {
             коко<span>клуб</span>
           </Link>
           <nav className={`nav ${mobileMenuOpen ? "nav-open" : ""}`} id="site-navigation" aria-label="Основная навигация" onClick={() => setMobileMenuOpen(false)}>
-            <NavLink to="/" end>
-              Афиша
-            </NavLink>
+            {me && <NavLink to="/" end>Главная</NavLink>}
+            <NavLink to={me ? "/afisha" : "/"} end>Афиша</NavLink>
             {me && <>
               <NavLink to="/people">Картотека</NavLink>
               <NavLink to="/projects">Проекты</NavLink>
