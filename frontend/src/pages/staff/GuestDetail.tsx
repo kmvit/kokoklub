@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../api";
+import { useAuth } from "../../auth";
 import { Modal } from "../../components/ui";
 import { formatPhone, type StaffMember } from "../../types";
 import StaffTopUp from "./StaffTopUp";
@@ -8,6 +9,11 @@ import StaffPhoto from "./StaffPhoto";
 
 export default function GuestDetail() {
   const { id } = useParams();
+  return <GuestDetails key={id} id={id} />;
+}
+
+function GuestDetails({ id }: { id?: string }) {
+  const { me } = useAuth();
   const [member, setMember] = useState<StaffMember | null>(null);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -65,7 +71,8 @@ export default function GuestDetail() {
             {member.card && <p className="muted small">UID карты: {member.card.uid}</p>}
             {member.is_hidden && <p className="muted small">Скрыт из каталога участников</p>}
             <Link className="btn" to={`/staff/bind?member=${member.id}`}>{member.card ? "Перевыпустить карту" : "Привязать карту"}</Link>
-            <StaffTopUp key={member.id} member={member} onBalance={(balance) => setMember({ ...member, balance })} />
+            {me && <StaffTopUp key={me.id} member={member} cashierId={me.id}
+              onBalance={(balance) => setMember((current) => current && { ...current, balance })} />}
             <div className="staff-guest-manage">
               <h2>Управление гостем</h2>
               <button className="btn btn-ghost" onClick={toggleHidden} disabled={busy}>{member.is_hidden ? "Показать в каталоге" : "Скрыть из каталога"}</button>

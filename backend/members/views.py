@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -194,6 +196,7 @@ class ProjectImageView(APIView):
 
 
 class AccountView(APIView):
+    @method_decorator(never_cache)
     def get(self, request):
         return Response({
             "balance": format(account_balance(request.user), ".2f"),

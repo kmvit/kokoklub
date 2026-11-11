@@ -4,17 +4,38 @@ import { api } from "../api";
 
 export const rubles = (value: string) => Number(value).toLocaleString("ru-RU", { style: "currency", currency: "RUB" });
 type AccountData = { balance: string; topups: { id: number; amount: string; created_at: string }[] };
+const BALANCE_REFRESH_MS = 10_000;
+
 export default function Account({ compact = false }: { compact?: boolean }) {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [error, setError] = useState("");
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => {
     let active = true;
-    const reload = () => api.get<AccountData>("/me/account/").then((data) => { if (active) { setAccount(data); setError(""); } }).catch((e) => { if (active) setError(e.message); });
+    let inFlight = false;
+    const reload = async () => {
+      if (inFlight || document.visibilityState !== "visible") return;
+      inFlight = true;
+      try {
+        const data = await api.get<AccountData>("/me/account/");
+        if (active) {
+          setAccount(data);
+          setError("");
+        }
+      } catch (e) {
+        if (active) setError((e as Error).message);
+      } finally {
+        inFlight = false;
+      }
+    };
     void reload();
-    const onFocus = () => { if (document.visibilityState === "visible") void reload(); };
-    document.addEventListener("visibilitychange", onFocus);
-    return () => { active = false; document.removeEventListener("visibilitychange", onFocus); };
+    const timer = window.setInterval(reload, BALANCE_REFRESH_MS);
+    document.addEventListener("visibilitychange", reload);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", reload);
+    };
   }, []);
   return <section className="card account-card member-account" aria-label="Клубный счёт">
     <div className="balance-card">
