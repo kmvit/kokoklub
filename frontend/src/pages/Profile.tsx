@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { PageHeading } from "../components/ClubDesign";
+import ProjectEditor, { newProject, ProjectDirections } from "../components/ProjectEditor";
 import Account from "../components/Account";
 import { Avatar, StatusDot, useToast } from "../components/ui";
 import { STATUS_LABEL, formatPhone, type Activity, type Me, type Status } from "../types";
@@ -56,6 +57,7 @@ export default function Profile() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [suggested, setSuggested] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [galleryBusy, setGalleryBusy] = useState(false);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -70,6 +72,7 @@ export default function Profile() {
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy || galleryBusy) return;
     setBusy(true);
     setError("");
     try {
@@ -207,17 +210,23 @@ export default function Profile() {
 
         <section>
           <h2>Мои проекты</h2>
+          <ProjectDirections />
           <p className="muted">После сохранения анкеты проекты появятся в разделе «Проекты» для участников клуба.</p>
           {form.projects.map((project, index) => (
-            <fieldset className="project-editor" key={index}>
-              <legend>Проект {index + 1}</legend>
-              <label className="field"><span>Название *</span><input className="input" required maxLength={150} value={project.title} onChange={(e) => set("projects", form.projects.map((p, i) => i === index ? { ...p, title: e.target.value } : p))} /></label>
-              <label className="field"><span>Описание</span><textarea className="input" rows={3} maxLength={5000} value={project.description} onChange={(e) => set("projects", form.projects.map((p, i) => i === index ? { ...p, description: e.target.value } : p))} /></label>
-              <label className="field"><span>Ссылка</span><input className="input" type="url" maxLength={200} placeholder="https://" value={project.url} onChange={(e) => set("projects", form.projects.map((p, i) => i === index ? { ...p, url: e.target.value } : p))} /></label>
-              <button type="button" className="link" onClick={() => set("projects", form.projects.filter((_, i) => i !== index))}>Удалить проект</button>
-            </fieldset>
+            <ProjectEditor
+              key={project.id ?? `new-${index}`}
+              project={project}
+              busy={busy || galleryBusy}
+              onGalleryBusy={setGalleryBusy}
+              onChange={(fields) => setForm((current) => current && ({
+                ...current,
+                projects: current.projects.map((item, i) => i === index ? { ...item, ...fields } : item),
+              }))}
+              onRemove={() => set("projects", form.projects.filter((_, i) => i !== index))}
+            />
           ))}
-          <button type="button" className="btn btn-ghost" disabled={form.projects.length >= 20} onClick={() => set("projects", [...form.projects, { title: "", description: "", url: "" }])}>Добавить проект</button>
+          <button type="button" className="btn btn-ghost" disabled={busy || galleryBusy || form.projects.length >= 20}
+            onClick={() => set("projects", [...form.projects, newProject()])}>Добавить проект</button>
         </section>
 
         <h3>Статус</h3>
@@ -256,7 +265,7 @@ export default function Profile() {
           </label>
         )}
         {error && <div className="error">{error}</div>}
-        <button className="btn btn-wide" disabled={busy || (!me.has_consent && !consent)}>
+        <button className="btn btn-wide" disabled={busy || galleryBusy || (!me.has_consent && !consent)}>
           {me.profile_complete ? "Сохранить" : "Сохранить анкету"}
         </button>
       </form>

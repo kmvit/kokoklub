@@ -192,6 +192,42 @@ class ClubStructureTests(TestCase):
         self.api.patch("/api/me/", {"projects": []}, format="json")
         self.assertFalse(self.member.projects.exists())
 
+    def test_project_gallery_survives_profile_edits_and_only_owner_can_change_it(self):
+        from io import BytesIO
+        from tempfile import TemporaryDirectory
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        self.api.force_authenticate(self.member)
+        project = self.member.projects.create(title="Галерея")
+        image = BytesIO()
+        Image.new("RGB", (24, 24)).save(image, "PNG")
+        gallery = f"/api/me/projects/{project.pk}/images/"
+        detail = f"/api/projects/{project.pk}/"
+        with TemporaryDirectory() as media, self.settings(MEDIA_ROOT=media):
+            for _ in range(2):
+                upload = SimpleUploadedFile("art.png", image.getvalue(), content_type="image/png")
+                response = self.api.post(gallery, {"photo": upload}, format="multipart")
+                self.assertEqual(response.status_code, 201, response.data)
+            cover = response.data[1]["id"]
+            response = self.api.patch(f"{gallery}{cover}/", {}, format="json")
+            self.assertEqual(response.data[0]["id"], cover)
+            response = self.api.patch("/api/me/", {"projects": [{
+                "id": project.pk, "title": "Новая галерея", "directions": ["Живопись", "Дизайн"],
+                "links": [{"label": "Портфолио", "url": "https://example.com"}],
+            }]}, format="json")
+            self.assertEqual(response.status_code, 200, response.data)
+            self.api.force_authenticate(self.staff)
+            response = self.api.get(detail)
+            self.assertEqual(response.data["title"], "Новая галерея")
+            self.assertEqual(response.data["directions"], ["Живопись", "Дизайн"])
+            self.assertEqual(response.data["links"][0]["label"], "Портфолио")
+            self.assertEqual(response.data["images"][0]["id"], cover)
+            self.assertEqual(self.api.delete(f"{gallery}{cover}/").status_code, 404)
+            self.api.force_authenticate(None)
+            self.assertEqual(self.api.get(detail).status_code, 401)
+
     def test_invalid_projects_leave_existing_profile_unchanged(self):
         from .models import Project
         Project.objects.create(owner=self.member, title="Оригинал")

@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 from club.queries import open_visits
 
-from .models import Activity, Hobby, User, Project
+from .models import Activity, Hobby, User, Project, ProjectImage
 
 
 class HobbiesField(serializers.Field):
@@ -95,11 +95,55 @@ class MemberDetailSerializer(MemberShortSerializer):
         return card.issued_at.date() if card else None
 
 
+class ProjectImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectImage
+        fields = ["id", "image", "is_cover"]
+
+
+class ProjectLinkSerializer(serializers.Serializer):
+    label = serializers.CharField(max_length=60)
+    url = serializers.URLField(max_length=500)
+
+    def validate_url(self, value):
+        if not value.lower().startswith(("https://", "http://")):
+            raise serializers.ValidationError("Укажите ссылку с http:// или https://")
+        return value
+
+
 class ProjectSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False, min_value=1)
+    directions = serializers.ListField(
+        child=serializers.CharField(max_length=40), max_length=5, required=False,
+    )
+    links = ProjectLinkSerializer(many=True, max_length=6, required=False)
+    images = ProjectImageSerializer(many=True, read_only=True)
+
     class Meta:
         model = Project
-        fields = ["id", "title", "description", "url"]
-        read_only_fields = ["id"]
+        fields = [
+            "id", "title", "summary", "description", "url", "directions",
+            "author_role", "stage", "looking_for", "links", "images",
+        ]
+
+    def validate(self, attrs):
+        # Older clients omit the summary and can still save their existing data.
+        if "id" not in attrs and attrs.get("summary") == "":
+            raise serializers.ValidationError({"summary": "Добавьте короткое описание."})
+        return attrs
+
+    def validate_directions(self, values):
+        return list(dict.fromkeys(values))
+
+
+class ClubProjectSerializer(ProjectSerializer):
+    owner = serializers.SerializerMethodField()
+
+    class Meta(ProjectSerializer.Meta):
+        fields = ProjectSerializer.Meta.fields + ["owner"]
+
+    def get_owner(self, obj):
+        return {"id": obj.owner_id, "full_name": obj.owner.full_name}
 
 
 class MeSerializer(serializers.ModelSerializer):
@@ -182,6 +226,15 @@ class MeSerializer(serializers.ModelSerializer):
         if hobbies is not None:
             instance.hobbies.set([Hobby.objects.get_or_create(name=n)[0] for n in hobbies])
         if projects is not None:
-            instance.projects.all().delete()
-            Project.objects.bulk_create([Project(owner=instance, **p) for p in projects])
+            existing = {project.pk: project for project in instance.projects.all()}
+            ids = [project["id"] for project in projects if "id" in project]
+            if len(ids) != len(set(ids)) or any(pk not in existing for pk in ids):
+                raise serializers.ValidationError({"detail": "Список проектов изменился. Обновите анкету."})
+            instance.projects.exclude(pk__in=ids).delete()
+            for fields in projects:
+                pk = fields.pop("id", None)
+                if pk is None:
+                    Project.objects.create(owner=instance, **fields)
+                else:
+                    Project.objects.filter(pk=pk).update(**fields)
         return instance

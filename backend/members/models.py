@@ -1,7 +1,9 @@
 """Участник клуба — он же учётная запись. Вход по почте и паролю."""
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 
 from .phone import normalize_phone
@@ -127,10 +129,37 @@ class Project(models.Model):
     description = models.TextField("описание", blank=True, max_length=5000)
     url = models.URLField("ссылка", blank=True)
 
+    class Stage(models.TextChoices):
+        IDEA = "idea", "Идея"
+        IN_PROGRESS = "in_progress", "В работе"
+        COMPLETE = "complete", "Готово"
+
+    summary = models.CharField("краткое описание", max_length=240, blank=True)
+    directions = models.JSONField(default=list, blank=True)
+    author_role = models.CharField("роль автора", max_length=120, blank=True)
+    stage = models.CharField(max_length=16, choices=Stage.choices, blank=True)
+    looking_for = models.CharField("ищу для проекта", max_length=300, blank=True)
+    links = models.JSONField(default=list, blank=True)
+
     class Meta:
         ordering = ["-id"]
         verbose_name = "проект"
         verbose_name_plural = "проекты"
+
+
+class ProjectImage(models.Model):
+    project = models.ForeignKey(Project, related_name="images", on_delete=models.CASCADE)
+    image = models.ImageField(upload_to="projects/")
+    is_cover = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-is_cover", "id"]
+
+
+@receiver(post_delete, sender=ProjectImage)
+def delete_project_image_file(sender, instance, **kwargs):
+    image = instance.image
+    transaction.on_commit(lambda: image.storage.delete(image.name), robust=True)
 
 
 class Event(models.Model):

@@ -32,11 +32,30 @@ export interface MemberDetail extends MemberShort {
   member_since: string | null;
 }
 
+export const PROJECT_STAGES = {
+  idea: "Идея",
+  in_progress: "В работе",
+  complete: "Готово",
+} as const;
+
+export interface ProjectImage {
+  id: number;
+  image: string;
+  is_cover: boolean;
+}
+
 export interface Project {
   id?: number;
   title: string;
+  summary: string;
   description: string;
   url: string;
+  directions: string[];
+  author_role: string;
+  stage: keyof typeof PROJECT_STAGES | "";
+  looking_for: string;
+  links: { label: string; url: string }[];
+  images: ProjectImage[];
 }
 
 export interface ClubProject extends Project {

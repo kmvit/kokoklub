@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
@@ -9,9 +10,11 @@ from rest_framework.views import APIView
 from club.queries import with_club_flags
 
 from .images import shrink_photo
-from .models import Activity, Hobby, User, Project, Event, TopUp, account_balance
+from .models import Activity, Hobby, User, Project, ProjectImage, Event, TopUp, account_balance
 from .serializers import (
     ActivitySerializer,
+    ClubProjectSerializer,
+    ProjectImageSerializer,
     MeSerializer,
     MemberDetailSerializer,
     MemberShortSerializer,
@@ -138,15 +141,56 @@ class EventsView(APIView):
         )))
 
 
+def visible_projects():
+    return (
+        Project.objects.filter(owner__in=catalog_queryset())
+        .select_related("owner")
+        .prefetch_related("images")
+    )
+
+
 class ProjectsView(APIView):
     def get(self, request):
-        from .serializers import ProjectSerializer
-        projects = Project.objects.filter(owner__in=catalog_queryset()).select_related("owner")
-        return Response([
-            {**ProjectSerializer(p).data, "owner": {
-                "id": p.owner_id, "full_name": p.owner.full_name,
-            }} for p in projects
-        ])
+        return Response(ClubProjectSerializer(visible_projects(), many=True).data)
+
+
+class ProjectDetailView(APIView):
+    def get(self, request, pk):
+        return Response(ClubProjectSerializer(get_object_or_404(visible_projects(), pk=pk)).data)
+
+
+class ProjectImagesView(APIView):
+    @transaction.atomic
+    def post(self, request, pk):
+        project = get_object_or_404(Project.objects.select_for_update(), pk=pk, owner=request.user)
+        upload = request.FILES.get("photo")
+        if not upload or upload.size > 10 * 1024 * 1024:
+            return Response({"detail": "Выберите изображение до 10 МБ"}, status=400)
+        if project.images.count() >= 8:
+            return Response({"detail": "Можно добавить до 8 изображений"}, status=400)
+        try:
+            photo = shrink_photo(upload)
+        except ValueError as error:
+            return Response({"detail": str(error)}, status=400)
+        project.images.create(image=photo)
+        return Response(ProjectImageSerializer(project.images.all(), many=True).data, status=201)
+
+
+class ProjectImageView(APIView):
+    @transaction.atomic
+    def patch(self, request, pk, image_id):
+        project = get_object_or_404(Project.objects.select_for_update(), pk=pk, owner=request.user)
+        image = get_object_or_404(project.images, pk=image_id)
+        project.images.filter(is_cover=True).update(is_cover=False)
+        image.is_cover = True
+        image.save(update_fields=["is_cover"])
+        return Response(ProjectImageSerializer(project.images.all(), many=True).data)
+
+    @transaction.atomic
+    def delete(self, request, pk, image_id):
+        project = get_object_or_404(Project.objects.select_for_update(), pk=pk, owner=request.user)
+        get_object_or_404(project.images, pk=image_id).delete()
+        return Response(ProjectImageSerializer(project.images.all(), many=True).data)
 
 
 class AccountView(APIView):

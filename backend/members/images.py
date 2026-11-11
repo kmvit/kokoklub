@@ -13,7 +13,7 @@ def shrink_photo(upload) -> ContentFile:
     try:
         img = Image.open(upload)
         img = ImageOps.exif_transpose(img).convert("RGB")
-    except (UnidentifiedImageError, OSError) as e:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
         raise ValueError("Не получилось открыть фото — пришлите JPG или PNG") from e
     img.thumbnail((1000, 1000))
     buf = io.BytesIO()

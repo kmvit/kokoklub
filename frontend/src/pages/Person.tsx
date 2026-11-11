@@ -84,7 +84,14 @@ export default function Person() {
         <Section title="Чем могу помочь" text={person.can_help} />
         <Section title="Кого ищу" text={person.looking_for} />
         <Section title="О себе" text={person.about} />
-        {person.projects.length > 0 && <section className="profile-section"><h3>Проекты</h3>{person.projects.map((project) => <article key={project.id}><h3>{project.title}</h3><p className="pre">{project.description}</p>{project.url && <p><a href={project.url} target="_blank" rel="noreferrer">Открыть проект ↗</a></p>}</article>)}</section>}
+        {person.projects.length > 0 && (
+          <section className="profile-section">
+            <h3>Проекты</h3>
+            <ul>{person.projects.map((project) => (
+              <li key={project.id}><Link to={`/projects/${project.id}`}>{project.title}</Link></li>
+            ))}</ul>
+          </section>
+        )}
         {person.hobbies.length > 0 && (
           <section className="profile-section">
             <h3>Хобби</h3>
