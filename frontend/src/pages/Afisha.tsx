@@ -2,45 +2,43 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import { ClubEmpty, ClubFlower } from "../components/ClubDesign";
+import { ClubEmpty } from "../components/ClubDesign";
 
-type Event = { id: number; title: string; description: string; starts_at: string; location: string };
-const datePart = (value: string, options: Intl.DateTimeFormatOptions) => new Date(value).toLocaleString("ru-RU", { ...options, timeZone: "Europe/Moscow" });
+import EventCard, { type ClubEvent } from "../components/EventCard";
 
 export default function Afisha() {
   const { me } = useAuth();
-  const [events, setEvents] = useState<Event[] | null>(null);
+  const [events, setEvents] = useState<ClubEvent[] | null>(null);
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    api.get<Event[]>("/events/").then((data) => { if (active) setEvents(data); }).catch((e) => { if (active) setError(e.message); });
+    setError("");
+    api.get<ClubEvent[]>("/events/").then((data) => { if (active) setEvents(data); }).catch((e) => { if (active) setError(e.message); });
     return () => { active = false; };
-  }, []);
+  }, [attempt]);
 
   return <div className="page afisha-page">
-    <section className="art-hero" aria-labelledby="afisha-title">
-      <div className="art-hero-copy">
-        <p className="eyebrow"><span className="live-mark" /> Коко клуб · Место встречи</p>
-        <h1 id="afisha-title">Хорошие<br />вечера —<br /><span>свои люди.</span></h1>
-        <p className="hero-description">Музыка, разговоры и встречи, ради которых хочется выйти из дома.</p>
-        <a className="btn btn-ink" href="#afisha">Что в афише <span aria-hidden="true">↘</span></a>
-        <span className="hero-note">Увидимся в коко</span>
+    <section className="club-cover" aria-labelledby="afisha-title">
+      <img className="club-cover-image" src="/img/lounge.jpg" width="1200" height="1600" alt="Тёплый свет, кресла и диско-шары в зале Коко клуба" fetchPriority="high" />
+      <div className="club-cover-content">
+        <span className="cover-label">Место для своих людей</span>
+        <h1 id="afisha-title">Встретимся<br />в коко.</h1>
+        <p>За музыкой, новыми знакомствами<br />и разговорами без спешки.</p>
+        <a className="btn" href="#afisha">Выбрать вечер <span aria-hidden="true">↗</span></a>
       </div>
-      <div className="art-hero-visual">
-        <div className="hero-photo"><img src="/img/lounge.jpg" width="1200" height="1600" alt="Зал клуба: винил, диско-шары и кресла у камина" fetchPriority="high" /><span className="photo-caption">Есть место для тебя.</span></div>
-        <div className="hero-sticker" aria-hidden="true"><span>Планы на вечер?</span><strong>Идём<br />в коко!</strong><span className="sticker-arrow">↗</span></div>
-        <ClubFlower className="hero-flower" />
-      </div>
+      <div className="cover-footnote"><span>Кофе днём. Винил вечером. Свои — всегда.</span><span>Коко клуб</span></div>
     </section>
-    <div className="club-ribbon" aria-label="Музыка, люди, идеи, встречи"><span>Музыка</span><i aria-hidden="true">✳</i><span>Люди</span><i aria-hidden="true">✳</i><span>Идеи</span><i aria-hidden="true">✳</i><span>Встречи</span><i aria-hidden="true">✳</i><span>Коко клуб</span></div>
+    <nav className="discovery-links" aria-label="Знакомство с клубом">
+      <a href="#afisha"><span>Планы на вечер</span><strong>Афиша клуба <span aria-hidden="true">↗</span></strong></a>
+      <Link to={me ? "/people" : "/login?mode=register"}><span>Новые знакомства</span><strong>Найти своих <span aria-hidden="true">↗</span></strong></Link>
+      <Link to={me ? "/me" : "/login?mode=register"}><span>{me ? "Всё под рукой" : "Станьте частью клуба"}</span><strong>{me ? "Мой кабинет" : "Присоединиться"} <span aria-hidden="true">↗</span></strong></Link>
+    </nav>
     <section id="afisha" className="afisha-events" aria-labelledby="events-title">
       <div className="section-heading"><div><p className="eyebrow">Повод собраться</p><h2 id="events-title">Афиша<span className="heading-dot">.</span></h2></div><span className="section-note">Ближайшее в клубе / время МСК</span></div>
-      {error ? <div className="notice bad" role="alert">{error}</div> : events === null ? <p className="muted" role="status">Загрузка афиши…</p> : events.length === 0 ? <ClubEmpty title="Новые встречи уже на подходе."><p>Скоро опубликуем ближайшие события. Заглядывайте в афишу.</p></ClubEmpty> :
-        <div className="event-grid">{events.map((event, index) => <article className={`event-poster event-tone-${index % 3}`} key={event.id}>
-          <div className="event-poster-top"><time dateTime={event.starts_at}><strong>{datePart(event.starts_at, { day: "2-digit" })}</strong><span>{datePart(event.starts_at, { month: "long" })}</span></time><span className="event-time">{datePart(event.starts_at, { hour: "2-digit", minute: "2-digit" })}</span></div>
-          <ClubFlower className="event-flower" /><h3>{event.title}</h3><p className="pre">{event.description}</p><div className="event-poster-bottom"><span>{event.location || "Коко клуб"}</span><span aria-hidden="true">↗</span></div>
-        </article>)}</div>}
+      {error ? <div className="notice bad" role="alert">{error} <button className="link" onClick={() => setAttempt((value) => value + 1)}>Попробовать ещё раз</button></div> : events === null ? <p className="muted" role="status">Загрузка афиши…</p> : events.length === 0 ? <ClubEmpty title="Новые встречи уже на подходе."><p>Скоро опубликуем ближайшие события. Заглядывайте в афишу.</p></ClubEmpty> :
+        <div className="event-grid">{events.map((event, index) => <EventCard key={event.id} event={event} index={index} />)}</div>}
     </section>
-    {!me && <div className="join-strip"><div><p className="eyebrow">Всё начинается со знакомства</p><h2>Будем знакомы?</h2><p>Зарегистрируйтесь, чтобы стать частью клуба.</p></div><Link className="btn btn-ink" to="/login">Регистрация / Войти <span aria-hidden="true">↗</span></Link></div>}
+    {!me && <div className="join-strip"><div><p className="eyebrow">Всё начинается со знакомства</p><h2>Будем знакомы?</h2><p>Зарегистрируйтесь, чтобы стать частью клуба.</p></div><Link className="btn btn-ink" to="/login?mode=register">Стать участником <span aria-hidden="true">↗</span></Link></div>}
   </div>;
 }

@@ -30,7 +30,7 @@ function StatusMenu() {
   };
   return (
     <div className="status-menu" ref={box}>
-      <button className="status-btn" onClick={() => setOpen(!open)} title="Мой статус">
+      <button className="status-btn" onClick={() => setOpen(!open)} title="Мой статус" aria-label="Изменить мой статус" aria-expanded={open} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
         <StatusDot status={me.status} />
         <span className="hide-sm">{STATUS_LABEL[me.status]}</span>
       </button>
@@ -50,6 +50,7 @@ function StatusMenu() {
 export default function Layout() {
   const { me, reload } = useAuth();
   const pathname = useLocation().pathname;
+  const staffArea = Boolean(me?.is_staff && pathname.startsWith("/staff"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // бар клуба живёт в Падаче — ссылка на меню приходит из настроек бэкенда
   const [menuUrl, setMenuUrl] = useState<string | null>(null);
@@ -75,7 +76,7 @@ export default function Layout() {
   }, [reload]);
 
   return (
-    <div className="app">
+    <div className={`app ${me ? "app-member" : "app-guest"} ${staffArea ? "app-staff" : ""}`}>
       <a href="#main-content" className="skip-link">Перейти к содержимому</a>
       <header className="header">
         <div className="header-inner">
@@ -83,31 +84,23 @@ export default function Layout() {
             коко<span>клуб</span>
           </Link>
           <nav className={`nav ${mobileMenuOpen ? "nav-open" : ""}`} id="site-navigation" aria-label="Основная навигация" onClick={() => setMobileMenuOpen(false)}>
-            {me && <NavLink to="/" end>Главная</NavLink>}
-            <NavLink to={me ? "/afisha" : "/"} end>Афиша</NavLink>
-            {me && <>
-              <NavLink to="/people">Картотека</NavLink>
-              <NavLink to="/projects">Проекты</NavLink>
-              <NavLink to="/me">Личный кабинет</NavLink>
-              {menuUrl && <a href={menuUrl}>Меню</a>}
+            {staffArea ? <><span className="workspace-label">Рабочий кабинет</span><Link to="/">Перейти в клуб ↗</Link></> : <>
+              {me && <NavLink to="/" end>Главная</NavLink>}
+              <NavLink to="/afisha">Афиша</NavLink>
+              {!me && <NavLink to="/login?mode=register">Стать участником</NavLink>}
+              {me && <><NavLink to="/people">Люди</NavLink><NavLink to="/projects">Проекты</NavLink><NavLink to="/messages">Сообщения{me.unread > 0 && <span className="count">{me.unread}</span>}</NavLink>{menuUrl && <a href={menuUrl}>Меню бара</a>}</>}
+              {me?.is_staff && <NavLink className="workspace-switch" to="/staff">Кабинет кассира ↗</NavLink>}
             </>}
-            {me && (
-              <NavLink to="/messages">
-                Сообщения
-                {me.unread > 0 && <span className="count">{me.unread}</span>}
-              </NavLink>
-            )}
-            {me?.is_staff && <NavLink to="/staff">Персонал</NavLink>}
           </nav>
           <div className="header-right">
-            <StatusMenu />
+            {!staffArea && <StatusMenu />}
             {me ? (
-              <Link to="/me" className="me-link" title="Мой профиль">
-                <Avatar name={me.full_name || "?"} photo={me.photo} size={36} />
+              <Link to="/me" className="me-link" title="Мой кабинет" aria-label="Мой кабинет">
+                <Avatar name={me.full_name || "?"} photo={me.photo} size={36} /><span className="profile-link-label">Кабинет</span>
               </Link>
             ) : (
               <Link to="/login" className="btn btn-small">
-                Регистрация / Войти
+                Войти
               </Link>
             )}
           </div>
@@ -123,9 +116,18 @@ export default function Layout() {
           </button>
         </div>
       </header>
-      <main className="main" id="main-content">
+      <main className="main" id="main-content" tabIndex={-1}>
         <Outlet />
       </main>
+      {me && !staffArea && <nav className="mobile-dock" aria-label="Быстрые разделы">
+        {([
+          ["/", "Главная", "M3 10l9-7 9 7v10H3z M9 20v-7h6v7"],
+          ["/afisha", "Афиша", "M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16"],
+          ["/people", "Люди", "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3 M22 21v-3a4 4 0 0 0-3-4 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M17 3a4 4 0 0 1 0 8"],
+          ["/messages", "Сообщения", "M3 4h18v13H8l-5 4z M7 9h10 M7 13h6"],
+          ["/me", "Кабинет", "M20 21v-3a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v3 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8"],
+        ] as const).map(([to, label, path]) => <NavLink key={to} to={to} end={to === "/"}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg><span>{label}</span>{to === "/messages" && me.unread > 0 && <span className="dock-badge" aria-label={`${me.unread} непрочитанных`}>{me.unread > 99 ? "99+" : me.unread}</span>}</NavLink>)}
+      </nav>}
       <footer className="club-footer"><Link to="/" className="footer-logo">коко<span>клуб</span></Link><p>Хорошо, когда есть свои.</p><span>Люди. Идеи. Встречи.</span></footer>
     </div>
   );

@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import Account from "../components/Account";
 import { ClubEmpty } from "../components/ClubDesign";
-import PersonTile from "../components/PersonTile";
+import EventCard, { type ClubEvent } from "../components/EventCard";
 import ProjectCard from "../components/ProjectCard";
 import { Avatar } from "../components/ui";
 import type { ClubProject, MemberShort } from "../types";
@@ -25,30 +24,57 @@ function useHomeSection<T>(path: string) {
   return { data, error, retry: () => setAttempt((value) => value + 1) };
 }
 
+function SectionError({ message, retry }: { message: string; retry: () => void }) {
+  return <div className="notice bad" role="alert">{message} <button className="link" onClick={retry}>Попробовать ещё раз</button></div>;
+}
+
 function MemberHome() {
   const { me } = useAuth();
-  // Оба раздела загружаются независимо: ошибка одного не блокирует другой.
-  const members = useHomeSection<MemberShort>("/members/");
+  // Независимые запросы: афиша остаётся доступна при ошибке в другом разделе.
+  const events = useHomeSection<ClubEvent>("/events/");
   const projects = useHomeSection<ClubProject>("/projects/");
+  const members = useHomeSection<MemberShort>("/members/");
   if (!me) return null;
+  const upcoming = events.data?.filter((event) => new Date(event.starts_at).getTime() >= Date.now())
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at)).slice(0, 3);
 
-  return <div className="page member-home">
-    <div className="home-heading"><p className="eyebrow">Коко клуб / Главная</p><h1>{me.full_name ? `Привет, ${me.full_name.split(" ")[0]}.` : "Добро пожаловать в клуб."}</h1><p className="page-description">Наши люди, их идеи и ваша история в клубе.</p></div>
-    <nav className="home-sections" aria-label="Разделы главной"><a href="#club-members">Картотека <span aria-hidden="true">↓</span></a><a href="#club-projects">Проекты <span aria-hidden="true">↓</span></a><Link to="/afisha">Афиша <span aria-hidden="true">↗</span></Link></nav>
-    <div className="home-layout"><div className="home-feed">
-      <section id="club-members" className="home-section" aria-labelledby="members-title">
-        <div className="section-heading"><div><p className="eyebrow">Знакомые и будущие знакомые</p><h2 id="members-title">Картотека клубчан</h2></div><Link className="link section-all" to="/people">Все участники →</Link></div>
-        {members.error ? <div className="notice bad" role="alert">{members.error} <button className="link" onClick={members.retry}>Повторить</button></div> : members.data === null ? <p className="muted" role="status">Загружаем клубчан…</p> : members.data.length === 0 ? <ClubEmpty title="Здесь начинается знакомство."><p>Заполненные анкеты участников появятся в картотеке.</p><Link className="link" to="/me">Заполнить свою анкету →</Link></ClubEmpty> : <div className="people-grid home-people-grid">{members.data.slice(0, 6).map((member) => <PersonTile m={member} key={member.id} />)}</div>}
-      </section>
-      <section id="club-projects" className="home-section" aria-labelledby="projects-title">
-        <div className="section-heading"><div><p className="eyebrow">Идеи, которые нас объединяют</p><h2 id="projects-title">Проекты клубчан</h2></div><Link className="link section-all" to="/projects">Все проекты →</Link></div>
-        {projects.error ? <div className="notice bad" role="alert">{projects.error} <button className="link" onClick={projects.retry}>Повторить</button></div> : projects.data === null ? <p className="muted" role="status">Загружаем проекты…</p> : projects.data.length === 0 ? <ClubEmpty title="Расскажите, что вы задумали."><p>Добавьте проект в анкете — он появится здесь, и клубчане смогут узнать о нём.</p><Link className="link" to="/me">Добавить свой проект →</Link></ClubEmpty> : <div className="content-grid project-grid home-project-grid">{projects.data.slice(0, 4).map((project) => <ProjectCard key={project.id} project={project} />)}</div>}
-      </section>
-    </div><aside className="home-sidebar" aria-label="Мой кабинет">
-      <div className="card home-profile"><p className="eyebrow">Личный кабинет</p><Avatar name={me.full_name || "?"} photo={me.photo} size={64} /><h2>{me.full_name || "Ваш профиль"}</h2><p className="muted">{me.occupation || (me.profile_complete ? "Участник клуба" : "Заполните анкету, чтобы клубчане могли вас найти.")}</p><Link className="btn btn-ghost" to="/me">{me.profile_complete ? "Моя анкета" : "Заполнить анкету"} <span aria-hidden="true">↗</span></Link></div>
-      <Account compact />
-      <Link className="home-afisha-link" to="/afisha"><span className="eyebrow">Повод встретиться</span><strong>Что в афише?</strong><span className="muted">Ближайшие события клуба</span><span className="home-afisha-arrow" aria-hidden="true">↗</span></Link>
-    </aside></div>
+  return <div className="page club-home">
+    <section className="club-cover home-cover" aria-labelledby="home-title">
+      <img className="club-cover-image" src="/img/lounge.jpg" width="1200" height="1600" alt="Гостиная Коко клуба с мягкими креслами, винилом и тёплым светом" fetchPriority="high" />
+      <div className="club-cover-content">
+        <span className="cover-label">{me.full_name ? `Рады видеть вас, ${me.full_name.split(" ")[0]}` : "Ваше место в городе"}</span>
+        <h1 id="home-title">Свои люди.<br />Общие планы.</h1>
+        <p>Вечер с музыкой, неожиданное знакомство,<br className="home-desktop-break" /> идея, которую хочется сделать вместе.</p>
+        <a className="btn" href="#home-events">Что происходит в клубе <span aria-hidden="true">↘</span></a>
+      </div>
+      <div className="cover-footnote"><span>Загляните на кофе. Останьтесь ради людей.</span><span>Хорошо, когда есть свои.</span></div>
+    </section>
+
+    <nav className="discovery-links" aria-label="Жизнь клуба">
+      <a href="#home-events"><span>Повод встретиться</span><strong>Ближайшие события <span aria-hidden="true">↓</span></strong></a>
+      <a href="#home-projects"><span>То, что мы создаём</span><strong>Проекты клубчан <span aria-hidden="true">↓</span></strong></a>
+      <Link to="/people"><span>Знакомства продолжаются</span><strong>Найти своих <span aria-hidden="true">↗</span></strong></Link>
+    </nav>
+
+    <section id="home-events" className="home-editorial-section" aria-labelledby="home-events-title">
+      <div className="section-heading"><div><p className="eyebrow">Встречаемся в коко</p><h2 id="home-events-title">Планы на вечер</h2></div><Link className="btn btn-ghost" to="/afisha">Вся афиша <span aria-hidden="true">↗</span></Link></div>
+      <p className="home-section-intro">Ближайшие события клуба. Время московское.</p>
+      {events.error ? <SectionError message={events.error} retry={events.retry} /> : events.data === null ? <p className="muted" role="status">Загружаем афишу…</p> : upcoming?.length ? <div className="event-grid">{upcoming.map((event, index) => <EventCard key={event.id} event={event} index={index} />)}</div> : <ClubEmpty title="Скоро будет повод встретиться."><p>Готовим новые события. Они появятся здесь и в афише клуба.</p></ClubEmpty>}
+    </section>
+
+    <section id="home-projects" className="home-editorial-section home-projects-section" aria-labelledby="home-projects-title">
+      <div className="section-heading"><div><p className="eyebrow">Придумано нашими людьми</p><h2 id="home-projects-title">Из идеи — в дело</h2></div><Link className="btn btn-ghost" to="/projects">Все проекты <span aria-hidden="true">↗</span></Link></div>
+      <p className="home-section-intro">Посмотрите, над чем работают клубчане. Возможно, здесь начинается ваше следующее совместное дело.</p>
+      {projects.error ? <SectionError message={projects.error} retry={projects.retry} /> : projects.data === null ? <p className="muted" role="status">Загружаем проекты…</p> : projects.data.length === 0 ? <ClubEmpty title="У каждой идеи есть начало."><p>Расскажите о своём проекте — здесь его увидят клубчане.</p><Link className="link" to="/me">Добавить проект</Link></ClubEmpty> : <div className="home-project-showcase">{projects.data.slice(0, 3).map((project) => <ProjectCard key={project.id} project={project} />)}</div>}
+      <div className="home-project-invite"><span>Задумали что-то своё? Расскажите клубу.</span><Link className="link" to="/me">Добавить свой проект ↗</Link></div>
+    </section>
+
+    <section className="home-people-section" aria-labelledby="home-people-title">
+      <div className="home-people-copy"><p className="eyebrow">Главное в клубе</p><h2 id="home-people-title">Люди, с которыми<br />есть о чём.</h2><p>Сосед по столику, будущий соавтор или просто хороший собеседник. Познакомьтесь поближе.</p><Link className="btn btn-ghost" to="/people">Познакомиться с клубчанами <span aria-hidden="true">↗</span></Link></div>
+      <div className="home-member-list">
+        {members.error ? <SectionError message={members.error} retry={members.retry} /> : members.data === null ? <p className="muted" role="status">Загружаем клубчан…</p> : members.data.length === 0 ? <p className="muted">Здесь скоро появятся первые анкеты участников.</p> : members.data.slice(0, 4).map((member) => <Link className="home-member-row" to={`/people/${member.id}`} key={member.id}><Avatar name={member.full_name || "Участник"} photo={member.photo} size={56} /><div><strong>{member.full_name || "Участник клуба"}</strong><span>{member.occupation || member.activity || "Участник клуба"}</span></div><span aria-hidden="true">↗</span></Link>)}
+      </div>
+    </section>
   </div>;
 }
 

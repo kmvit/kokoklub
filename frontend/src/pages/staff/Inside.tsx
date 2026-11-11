@@ -38,9 +38,9 @@ export default function Inside() {
 
   return (
     <>
-      <h1>
+      <h2 className="staff-section-title">
         Сейчас в клубе {visits && <span className="muted">· {visits.length}</span>}
-      </h1>
+      </h2>
       {visits === null ? (
         <div className="muted">Загрузка…</div>
       ) : visits.length === 0 ? (

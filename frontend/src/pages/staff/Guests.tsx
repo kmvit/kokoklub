@@ -97,9 +97,11 @@ export default function Guests() {
 
   return (
     <>
+      <h2 className="staff-section-title">Гости и клубные карты</h2><p className="muted">Найдите гостя, чтобы открыть его счёт, пополнить баланс или выдать карту.</p>
       <div className="guests-head">
         <input
           className="input search"
+          aria-label="Найти гостя по телефону или имени"
           placeholder="Телефон (можно последние цифры) или имя"
           value={q}
           onChange={(e) => setQ(e.target.value)}
