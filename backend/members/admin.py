@@ -4,8 +4,13 @@ from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.core.exceptions import ValidationError
+from django.db.models import DecimalField, OuterRef, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
+from django.urls import reverse
+from django.utils.html import format_html
+from decimal import Decimal
 
-from .models import Activity, Hobby, User
+from .models import Activity, Hobby, User, TopUp
 from .phone import normalize_phone
 
 
@@ -71,12 +76,14 @@ class UserAdmin(BaseUserAdmin):
     form = UserEditForm
     add_form = UserAddForm
     ordering = ["-date_joined"]
-    list_display = ["email", "phone", "full_name", "activity", "status", "is_hidden", "is_staff", "date_joined"]
+    list_display = ["email", "phone", "full_name", "balance_display", "activity", "status", "is_hidden", "is_staff", "date_joined"]
     list_filter = ["is_staff", "is_hidden", "status", "activity"]
     search_fields = ["email", "phone", "full_name", "occupation"]
     filter_horizontal = ["hobbies", "groups", "user_permissions"]
+    readonly_fields = ["balance_display", "balance_history"]
     fieldsets = [
         (None, {"fields": ["email", "phone", "password"]}),
+        ("Клубный счёт", {"fields": ["balance_display", "balance_history"]}),
         ("Анкета", {"fields": [
             "full_name", "photo", "activity", "occupation", "hobbies",
             "about", "can_help", "looking_for", "telegram", "show_phone", "consent_at",
@@ -85,6 +92,23 @@ class UserAdmin(BaseUserAdmin):
         ("Доступ", {"fields": ["is_active", "is_staff", "is_superuser", "groups", "user_permissions"]}),
     ]
     add_fieldsets = [(None, {"classes": ["wide"], "fields": ["email", "phone", "password1", "password2", "is_staff"]})]
+
+
+    def get_queryset(self, request):
+        # Подзапрос не умножает сумму при фильтрации или поиске по связанным полям.
+        totals = TopUp.objects.filter(member=OuterRef("pk")).order_by().values("member").annotate(total=Sum("amount")).values("total")
+        return super().get_queryset(request).annotate(
+            club_balance=Coalesce(Subquery(totals), Value(Decimal("0.00")), output_field=DecimalField(max_digits=20, decimal_places=2)),
+        )
+
+    @admin.display(description="Баланс, ₽", ordering="club_balance")
+    def balance_display(self, obj):
+        return f"{obj.club_balance:,.2f}".replace(",", " ").replace(".", ",") + " ₽"
+
+    @admin.display(description="История счёта")
+    def balance_history(self, obj):
+        url = reverse("admin:members_topup_changelist") + f"?member__id__exact={obj.pk}"
+        return format_html('<a href="{}">Посмотреть пополнения пользователя</a>', url)
 
 
 @admin.register(Activity)

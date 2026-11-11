@@ -389,3 +389,38 @@ class StaffRoleIsolationTests(TestCase):
         self.assertEqual(self.api.post("/api/staff/scan/", {"uid": self.staff.cards.first().uid}).status_code, 404)
         self.assertEqual(self.api.post("/api/staff/card-lookup/", {"uid": self.staff.cards.first().uid}).status_code, 404)
         self.assertEqual(self.api.post(f"/api/staff/visits/{self.visit.pk}/leave/").status_code, 404)
+
+
+class AdminBalanceTests(TestCase):
+    def setUp(self):
+        from decimal import Decimal
+        from uuid import uuid4
+        from .models import TopUp
+        self.admin = User.objects.create_superuser("79004440001", email="balance-admin@example.com", password="admin-balance-test-2026")
+        self.member = make_member("79004440002", "Баланс тест")
+        self.empty = make_member("79004440003", "Без пополнений")
+        for amount in ("1000.25", "250.50"):
+            TopUp.objects.create(member=self.member, amount=Decimal(amount), created_by=self.admin, reference=uuid4())
+        self.client.force_login(self.admin)
+
+    def test_balance_in_user_list_and_detail(self):
+        response = self.client.get("/admin/members/user/")
+        self.assertContains(response, "1 250,75 ₽")
+        self.assertContains(response, "0,00 ₽")
+        response = self.client.get(f"/admin/members/user/{self.member.pk}/change/")
+        self.assertContains(response, "Клубный счёт")
+        self.assertContains(response, "1 250,75 ₽")
+        self.assertContains(response, f"/admin/members/topup/?member__id__exact={self.member.pk}")
+        self.assertNotIn("balance_display", response.context["adminform"].form.fields)
+
+    def test_history_filtered_to_selected_member(self):
+        response = self.client.get(f"/admin/members/topup/?member__id__exact={self.member.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["cl"].result_count, 2)
+        response = self.client.get(f"/admin/members/topup/?member__id__exact={self.empty.pk}")
+        self.assertEqual(response.context["cl"].result_count, 0)
+
+    def test_search_does_not_change_balance(self):
+        response = self.client.get("/admin/members/user/", {"q": self.member.phone})
+        self.assertContains(response, "1 250,75 ₽")
+        self.assertEqual(response.context["cl"].result_count, 1)
