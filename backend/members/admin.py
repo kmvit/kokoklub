@@ -16,7 +16,18 @@ def _clean_phone(form):
         raise ValidationError(str(e)) from e
 
 
+def phone_form_field():
+    # Поле модели хранит 11 цифр, но ввод может содержать +, пробелы и скобки.
+    # clean_phone нормализует значение до проверки ограничения модели.
+    return forms.CharField(
+        label="Телефон", max_length=32,
+        help_text="Российский мобильный номер: +7 (900) 123-45-67. Можно вводить с +7, 8 или без кода страны.",
+        widget=forms.TextInput(attrs={"type": "tel", "autocomplete": "tel", "placeholder": "+7 (900) 123-45-67"}),
+    )
+
+
 class UserAddForm(UserCreationForm):
+    phone = phone_form_field()
     email = forms.EmailField(label="Электронная почта", required=True)
     class Meta(UserCreationForm.Meta):
         model = User
@@ -29,6 +40,7 @@ class UserAddForm(UserCreationForm):
 
 
 class UserEditForm(UserChangeForm):
+    phone = phone_form_field()
     class Meta(UserChangeForm.Meta):
         model = User
         fields = "__all__"

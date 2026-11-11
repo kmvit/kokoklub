@@ -28,6 +28,56 @@ class PhoneTests(TestCase):
             normalize_phone("12345")
 
 
+class AdminPhoneTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            "79005550000", email="admin-phone@example.com", password="admin-test-password-2026",
+        )
+        self.client.force_login(self.admin)
+
+    def test_add_page_allows_formatted_phone(self):
+        response = self.client.get("/admin/members/user/add/")
+        field = response.context["adminform"].form.fields["phone"]
+        self.assertGreaterEqual(field.max_length, len("+7 (900) 123-45-67"))
+        self.assertEqual(field.widget.input_type, "tel")
+
+    def test_create_user_with_formatted_phone(self):
+        response = self.client.post("/admin/members/user/add/", {
+            "email": "new-member@example.com", "phone": "+7 (900) 123-45-67",
+            "password1": "unique-member-test-password-2026",
+            "password2": "unique-member-test-password-2026", "is_staff": "on",
+        })
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email="new-member@example.com")
+        self.assertEqual(user.phone, "79001234567")
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.check_password("unique-member-test-password-2026"))
+
+    def test_both_forms_normalize_formats_and_reject_invalid_or_duplicate_numbers(self):
+        from .admin import UserAddForm, UserEditForm
+        for form_class in (UserAddForm, UserEditForm):
+            for raw in ("+79001234567", "+7 (900) 123-45-67", "8 900 123 45 67", "9001234567"):
+                with self.subTest(form=form_class.__name__, phone=raw):
+                    form = form_class(data={"phone": raw, "email": "member@example.com"})
+                    form.is_valid()
+                    self.assertNotIn("phone", form.errors)
+                    self.assertEqual(form.cleaned_data["phone"], "79001234567")
+            for raw in ("+7911111110", "12345", "+790012345678", "+7 (900) 555-00-00"):
+                with self.subTest(form=form_class.__name__, phone=raw):
+                    form = form_class(data={"phone": raw, "email": "member@example.com"})
+                    form.is_valid()
+                    self.assertIn("phone", form.errors)
+
+    def test_edit_keeps_same_formatted_number(self):
+        from .admin import UserEditForm
+        form = UserEditForm(instance=self.admin, data={
+            "phone": "+7 (900) 555-00-00", "email": self.admin.email,
+        })
+        form.is_valid()
+        self.assertNotIn("phone", form.errors)
+        self.assertEqual(form.cleaned_data["phone"], self.admin.phone)
+
+
 class BootstrapAdminTests(TestCase):
     def test_creates_admin_once_without_resetting_password(self):
         with mock.patch.dict("os.environ", {
