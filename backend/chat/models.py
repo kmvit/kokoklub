@@ -34,7 +34,7 @@ class Conversation(models.Model):
 
     @classmethod
     def of(cls, user):
-        return cls.objects.filter(Q(user_a=user) | Q(user_b=user))
+        return cls.objects.filter(Q(user_a=user) | Q(user_b=user), user_a__is_staff=False, user_b__is_staff=False)
 
     def other(self, user):
         return self.user_b if self.user_a_id == user.pk else self.user_a

@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from members.permissions import IsClubUser
 from members.serializers import MemberShortSerializer
 from members.views import catalog_queryset
 
@@ -26,6 +27,7 @@ def _require_member(user):
 
 
 class ConversationListView(APIView):
+    permission_classes = [IsClubUser]
     def get(self, request):
         me = request.user
         convs = (
@@ -58,6 +60,7 @@ class ConversationListView(APIView):
 
 
 class ConversationView(APIView):
+    permission_classes = [IsClubUser]
     def get(self, request, pk):
         me = request.user
         conv = get_object_or_404(Conversation.of(me), pk=pk)
@@ -72,6 +75,7 @@ class ConversationView(APIView):
 
 
 class MessageCreateView(APIView):
+    permission_classes = [IsClubUser]
     def post(self, request, pk):
         me = request.user
         if denied := _require_member(me):

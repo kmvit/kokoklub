@@ -4,7 +4,7 @@ import { beginEntranceNfc } from "../../entranceNfc";
 export default function StaffLayout() {
   return (
     <div className="page staff-page">
-      <div className="staff-workspace-heading"><div><p className="eyebrow">Коко клуб</p><h1>Кабинет кассира</h1></div><Link className="btn btn-ghost" to="/">В клуб</Link></div>
+      <div className="staff-workspace-heading"><div><p className="eyebrow">Коко клуб</p><h1>Кабинет кассира</h1></div></div>
       <nav className="staff-tabs" aria-label="Разделы персонала">
         <NavLink to="/staff" end>
           <span className="staff-tab-desktop">Кто в клубе</span><span className="staff-tab-mobile">В клубе</span>

@@ -116,7 +116,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_member(self) -> bool:
         """Член клуба — тот, у кого привязана действующая карта."""
-        return self.cards.filter(is_active=True).exists()
+        return not self.is_staff and self.cards.filter(is_active=True).exists()
 
     @property
     def profile_complete(self) -> bool:

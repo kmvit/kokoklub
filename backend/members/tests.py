@@ -268,7 +268,8 @@ class ClubStructureTests(TestCase):
                 "links": [{"label": "Портфолио", "url": "https://example.com"}],
             }]}, format="json")
             self.assertEqual(response.status_code, 200, response.data)
-            self.api.force_authenticate(self.staff)
+            other_member = make_member("79003334455", "Другой участник")
+            self.api.force_authenticate(other_member)
             response = self.api.get(detail)
             self.assertEqual(response.data["title"], "Новая галерея")
             self.assertEqual(response.data["directions"], ["Живопись", "Дизайн"])
@@ -323,3 +324,68 @@ class ClubStructureTests(TestCase):
             self.assertEqual(res.status_code, 400)
         self.assertEqual(self.api.post(path, {"amount": "100", "reference": str(uuid4()), "payment_received": False}, format="json").status_code, 400)
         self.assertFalse(TopUp.objects.exists())
+
+
+class StaffRoleIsolationTests(TestCase):
+    def setUp(self):
+        from chat.models import Conversation, Message
+        from club.models import Visit
+        from .models import Project
+
+        self.member = make_member("79002220001", "Участник")
+        self.staff = make_member("79002220002", "Кассир", is_staff=True)
+        self.project = Project.objects.create(owner=self.staff, title="Старый проект кассира")
+        self.conversation = Conversation.between(self.member, self.staff)
+        Message.objects.create(conversation=self.conversation, sender=self.staff, text="Старое сообщение")
+        self.visit = Visit.objects.create(member=self.staff, card=self.staff.cards.first())
+        self.api = APIClient()
+
+    def test_staff_hidden_from_members_and_old_conversations(self):
+        self.api.force_authenticate(self.member)
+        self.assertNotIn(self.staff.pk, [u["id"] for u in self.api.get("/api/members/").data])
+        self.assertEqual(self.api.get(f"/api/members/{self.staff.pk}/").status_code, 404)
+        self.assertEqual(self.api.get("/api/projects/").data, [])
+        self.assertEqual(self.api.get(f"/api/projects/{self.project.pk}/").status_code, 404)
+        self.assertEqual(self.api.get("/api/chats/").data, [])
+        self.assertEqual(self.api.get(f"/api/chats/{self.conversation.pk}/").status_code, 404)
+        self.assertEqual(self.api.post(f"/api/chats/{self.conversation.pk}/messages/", {"text": "Привет"}).status_code, 404)
+        self.assertEqual(self.api.post("/api/chats/", {"member": self.staff.pk}).status_code, 404)
+        self.assertEqual(self.api.get("/api/me/").data["unread"], 0)
+        self.assertEqual(self.api.get("/api/staff/members/").status_code, 403)
+
+    def test_staff_cannot_use_member_endpoints_even_with_card(self):
+        self.api.force_authenticate(self.staff)
+        for method, path in [
+            ("get", "/api/members/"), ("get", f"/api/members/{self.member.pk}/"),
+            ("get", "/api/projects/"), ("get", f"/api/projects/{self.project.pk}/"),
+            ("get", "/api/me/account/"), ("patch", "/api/me/"),
+            ("post", "/api/me/photo/"), ("delete", "/api/me/photo/"),
+            ("get", "/api/hobbies/"),
+            ("post", f"/api/me/projects/{self.project.pk}/images/"),
+            ("patch", f"/api/me/projects/{self.project.pk}/images/1/"),
+            ("delete", f"/api/me/projects/{self.project.pk}/images/1/"),
+            ("get", "/api/chats/"), ("post", "/api/chats/"),
+            ("get", f"/api/chats/{self.conversation.pk}/"),
+            ("post", f"/api/chats/{self.conversation.pk}/messages/"),
+        ]:
+            with self.subTest(method=method, path=path):
+                self.assertEqual(getattr(self.api, method)(path).status_code, 403)
+        session = self.api.get("/api/me/")
+        self.assertEqual(session.status_code, 200)
+        self.assertTrue(session.data["is_staff"])
+        self.assertFalse(session.data["is_member"])
+        self.assertFalse(session.data["in_club"])
+        self.assertEqual(session.data["unread"], 0)
+
+    def test_staff_operations_remain_available_but_staff_are_not_guests(self):
+        self.api.force_authenticate(self.staff)
+        guests = self.api.get("/api/staff/members/")
+        self.assertEqual(guests.status_code, 200)
+        self.assertIn(self.member.pk, [u["id"] for u in guests.data])
+        self.assertNotIn(self.staff.pk, [u["id"] for u in guests.data])
+        self.assertEqual(self.api.get(f"/api/staff/members/{self.member.pk}/").status_code, 200)
+        self.assertEqual(self.api.get("/api/staff/inside/").data, [])
+        self.assertEqual(self.api.patch(f"/api/staff/members/{self.staff.pk}/", {"is_hidden": True}).status_code, 404)
+        self.assertEqual(self.api.post("/api/staff/scan/", {"uid": self.staff.cards.first().uid}).status_code, 404)
+        self.assertEqual(self.api.post("/api/staff/card-lookup/", {"uid": self.staff.cards.first().uid}).status_code, 404)
+        self.assertEqual(self.api.post(f"/api/staff/visits/{self.visit.pk}/leave/").status_code, 404)

@@ -64,7 +64,7 @@ class MemberShortSerializer(serializers.ModelSerializer):
         return photo_url(obj)
 
     def get_in_club(self, obj):
-        return in_club(obj)
+        return not obj.is_staff and in_club(obj)
 
 
 class MemberDetailSerializer(MemberShortSerializer):
@@ -179,17 +179,20 @@ class MeSerializer(serializers.ModelSerializer):
         return obj.is_member
 
     def get_in_club(self, obj):
-        return in_club(obj)
+        return not obj.is_staff and in_club(obj)
 
     def get_has_consent(self, obj):
         return obj.consent_at is not None
 
     def get_unread(self, obj):
+        if obj.is_staff:
+            return 0
         from chat.models import Message
 
         return (
             Message.objects.filter(
                 Q(conversation__user_a=obj) | Q(conversation__user_b=obj), read_at__isnull=True,
+                conversation__user_a__is_staff=False, conversation__user_b__is_staff=False,
             )
             .exclude(sender=obj)
             .count()

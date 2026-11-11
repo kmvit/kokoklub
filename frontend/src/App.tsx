@@ -24,7 +24,8 @@ function RequireAuth({ children, staff = false }: { children: ReactNode; staff?:
   const { me, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="page-loading">Загрузка…</div>;
-  if (!me || (staff && !me.is_staff)) {
+  if (me && staff && !me.is_staff) return <Navigate to="/" replace />;
+  if (!me) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
   return <>{children}</>;
@@ -39,6 +40,12 @@ function EntranceScanBoundary() {
 }
 
 export default function App() {
+  const { me, loading } = useAuth();
+  const { pathname } = useLocation();
+  if (loading) return <div className="page-loading" role="status">Загрузка…</div>;
+  if (me?.is_staff && pathname !== "/staff" && !pathname.startsWith("/staff/")) {
+    return <Navigate to="/staff" replace />;
+  }
   return (
     <><EntranceScanBoundary /><Routes>
       <Route element={<Layout />}>

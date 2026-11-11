@@ -98,7 +98,7 @@ class StaffMemberView(APIView):
 
     def patch(self, request, pk):
         """Модерация: скрыть из каталога или вернуть."""
-        member = get_object_or_404(User, pk=pk)
+        member = get_object_or_404(User, pk=pk, is_staff=False)
         if "is_hidden" in request.data:
             member.is_hidden = bool(request.data["is_hidden"])
             member.save(update_fields=["is_hidden"])
@@ -160,7 +160,7 @@ class ScanView(APIView):
             uid = normalize_uid(request.data.get("uid", ""))
         except ValueError as e:
             return Response({"detail": str(e)}, status=400)
-        card = Card.objects.filter(uid=uid, is_active=True).select_related("member").first()
+        card = Card.objects.filter(uid=uid, is_active=True, member__is_staff=False).select_related("member").first()
         if not card:
             return Response({"detail": "Карта не привязана ни к одному участнику", "uid": uid}, status=404)
 
@@ -198,7 +198,7 @@ class InsideView(APIView):
 
     def get(self, request):
         visits = (
-            open_visits()
+            open_visits().filter(member__is_staff=False)
             .select_related("member__activity")
             .prefetch_related("member__hobbies")
             .order_by("-entered_at")
@@ -216,7 +216,7 @@ class LeaveView(APIView):
     permission_classes = [IsAdminUser]
 
     def post(self, request, pk):
-        visit = get_object_or_404(open_visits(), pk=pk)
+        visit = get_object_or_404(open_visits(), pk=pk, member__is_staff=False)
         visit.left_at = timezone.now()
         visit.save(update_fields=["left_at"])
         return Response({"ok": True})

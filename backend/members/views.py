@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from club.queries import with_club_flags
 
+from .permissions import IsClubUser, CanAccessOwnProfile
 from .images import shrink_photo
 from .models import Activity, Hobby, User, Project, ProjectImage, Event, TopUp, account_balance
 from .serializers import (
@@ -26,7 +27,7 @@ from .serializers import (
 def catalog_queryset():
     """Кого видно на портале: участники с заполненной анкетой, не скрытые модератором."""
     qs = (
-        User.objects.filter(is_active=True, is_hidden=False, consent_at__isnull=False)
+        User.objects.filter(is_active=True, is_staff=False, is_hidden=False, consent_at__isnull=False)
         .exclude(full_name="")
         .select_related("activity")
         .prefetch_related("hobbies")
@@ -35,6 +36,7 @@ def catalog_queryset():
 
 
 class MeView(generics.RetrieveUpdateAPIView):
+    permission_classes = [CanAccessOwnProfile]
     serializer_class = MeSerializer
     http_method_names = ["get", "patch"]
 
@@ -43,6 +45,7 @@ class MeView(generics.RetrieveUpdateAPIView):
 
 
 class MyPhotoView(APIView):
+    permission_classes = [IsClubUser]
     def post(self, request):
         upload = request.FILES.get("photo")
         if not upload:
@@ -83,6 +86,7 @@ class ActivityListView(generics.ListAPIView):
 
 class HobbyListView(APIView):
     """Популярные хобби — подсказки в анкете и фильтр каталога."""
+    permission_classes = [IsClubUser]
 
     def get(self, request):
         names = (
@@ -96,6 +100,7 @@ class HobbyListView(APIView):
 
 class MemberListView(generics.ListAPIView):
     """Картотека доступна только вошедшим участникам."""
+    permission_classes = [IsClubUser]
     serializer_class = MemberShortSerializer
     pagination_class = None
 
@@ -127,6 +132,7 @@ class MemberListView(generics.ListAPIView):
 
 
 class MemberDetailView(APIView):
+    permission_classes = [IsClubUser]
 
     def get(self, request, pk):
         member = get_object_or_404(catalog_queryset(), pk=pk)
@@ -152,16 +158,19 @@ def visible_projects():
 
 
 class ProjectsView(APIView):
+    permission_classes = [IsClubUser]
     def get(self, request):
         return Response(ClubProjectSerializer(visible_projects(), many=True).data)
 
 
 class ProjectDetailView(APIView):
+    permission_classes = [IsClubUser]
     def get(self, request, pk):
         return Response(ClubProjectSerializer(get_object_or_404(visible_projects(), pk=pk)).data)
 
 
 class ProjectImagesView(APIView):
+    permission_classes = [IsClubUser]
     @transaction.atomic
     def post(self, request, pk):
         project = get_object_or_404(Project.objects.select_for_update(), pk=pk, owner=request.user)
@@ -179,6 +188,7 @@ class ProjectImagesView(APIView):
 
 
 class ProjectImageView(APIView):
+    permission_classes = [IsClubUser]
     @transaction.atomic
     def patch(self, request, pk, image_id):
         project = get_object_or_404(Project.objects.select_for_update(), pk=pk, owner=request.user)
@@ -196,6 +206,7 @@ class ProjectImageView(APIView):
 
 
 class AccountView(APIView):
+    permission_classes = [IsClubUser]
     @method_decorator(never_cache)
     def get(self, request):
         return Response({
