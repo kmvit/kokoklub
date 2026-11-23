@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import ClubCover from "../components/ClubCover";
 import { ClubEmpty } from "../components/ClubDesign";
 
 import EventCard, { type ClubEvent } from "../components/EventCard";
@@ -19,16 +20,7 @@ export default function Afisha() {
   }, [attempt]);
 
   return <div className="page afisha-page">
-    <section className="club-cover" aria-labelledby="afisha-title">
-      <img className="club-cover-image" src="/img/lounge.jpg" width="1200" height="1600" alt="Тёплый свет, кресла и диско-шары в зале Коко клуба" fetchPriority="high" />
-      <div className="club-cover-content">
-        <span className="cover-label">Место для своих людей</span>
-        <h1 id="afisha-title">Встретимся<br />в коко.</h1>
-        <p>За музыкой, новыми знакомствами<br />и разговорами без спешки.</p>
-        <a className="btn" href="#afisha">Выбрать вечер <span aria-hidden="true">↗</span></a>
-      </div>
-      <div className="cover-footnote"><span>Кофе днём. Винил вечером. Свои — всегда.</span><span>Коко клуб</span></div>
-    </section>
+    <ClubCover target="#afisha" />
     <nav className="discovery-links" aria-label="Знакомство с клубом">
       <a href="#afisha"><span>Планы на вечер</span><strong>Афиша клуба <span aria-hidden="true">↗</span></strong></a>
       <Link to={me ? "/people" : "/login?mode=register"}><span>Новые знакомства</span><strong>Найти своих <span aria-hidden="true">↗</span></strong></Link>

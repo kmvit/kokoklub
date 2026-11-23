@@ -2,16 +2,16 @@
    тростник, винил и янтарный свет. Всё оформление — на токенах ниже. */
 :root {
   color-scheme: dark;
-  --bg: #0e1a1c;
-  --surface: #142427;
-  --surface-2: #1c2f33;
-  --ink: #f3e9d6;
-  --muted: #a7a08f;
-  --line: #27393c;
-  --accent: #e0a82e;
-  --accent-ink: #1a1408;
-  --cognac: #b4532a;
-  --petrol: #1f3d5c;
+  --bg: #141210;
+  --surface: #1b1612;
+  --surface-2: #231c15;
+  --ink: #e9dfcf;
+  --muted: #b3a89b;
+  --line: #534433;
+  --accent: #bda070;
+  --accent-ink: #141210;
+  --cognac: #ac5938;
+  --petrol: #0e2b2b;
   --accent-soft: rgb(200 164 106 / 14%);
   --ok: #8fb07f;
   --ok-soft: rgb(143 176 127 / 15%);
@@ -22,8 +22,8 @@
   --radius: 4px;
   --radius-sm: 3px;
   --shadow: 0 1px 0 rgb(255 255 255 / 3%) inset, 0 12px 32px rgb(0 0 0 / 35%);
-  --font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --serif: "Playfair Display", Didot, Georgia, serif;
+  --font: "Koko Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Cormorant Garamond", Didot, Georgia, serif;
 }
 
 * {

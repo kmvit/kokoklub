@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import ClubCover from "../components/ClubCover";
 import { ClubEmpty } from "../components/ClubDesign";
 import EventCard, { type ClubEvent } from "../components/EventCard";
 import ProjectCard from "../components/ProjectCard";
@@ -39,16 +40,7 @@ function MemberHome() {
     .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at)).slice(0, 3);
 
   return <div className="page club-home">
-    <section className="club-cover home-cover" aria-labelledby="home-title">
-      <img className="club-cover-image" src="/img/lounge.jpg" width="1200" height="1600" alt="Гостиная Коко клуба с мягкими креслами, винилом и тёплым светом" fetchPriority="high" />
-      <div className="club-cover-content">
-        <span className="cover-label">{me.full_name ? `Рады видеть вас, ${me.full_name.split(" ")[0]}` : "Ваше место в городе"}</span>
-        <h1 id="home-title">Свои люди.<br />Общие планы.</h1>
-        <p>Вечер с музыкой, неожиданное знакомство,<br className="home-desktop-break" /> идея, которую хочется сделать вместе.</p>
-        <a className="btn" href="#home-events">Что происходит в клубе <span aria-hidden="true">↘</span></a>
-      </div>
-      <div className="cover-footnote"><span>Загляните на кофе. Останьтесь ради людей.</span><span>Хорошо, когда есть свои.</span></div>
-    </section>
+    <ClubCover target="#home-events" firstName={me.full_name.split(" ")[0]} />
 
     <nav className="discovery-links" aria-label="Жизнь клуба">
       <a href="#home-events"><span>Повод встретиться</span><strong>Ближайшие события <span aria-hidden="true">↓</span></strong></a>
