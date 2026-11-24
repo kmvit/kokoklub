@@ -254,17 +254,18 @@ window.KokoMock = function (SEED) {
     u.balance -= cost; put('users', u); tx(u, { credits: -cost, kind: 'entry', days: useIncluded ? -1 : 0, note: `${note} (${how})` });
     return { cost, used_entry: useIncluded, used_free: useFreeEntry };
   };
+  const seededUsers = new Set(SEED.users.map(user => user.id));
+  const isPersonalProfile = user => user && !seededUsers.has(user.id) && ['guest', 'resident'].includes(user.role);
   const auth = (tok, need) => {
     const s = tok && get('sessions', tok), u = s && get('users', s.user);
-    if (!u) fail(401, 'Войдите в клуб');
+    if (!isPersonalProfile(u)) fail(401, 'Войдите в клуб');
     maybeRenew(u);
     if (need === 'resident' && !isRes(u)) fail(403, 'Раздел открыт резидентам');
     if (need === 'admin' && u.role !== 'admin') fail(403, 'Только для управляющих клуба');
     if (need === 'staff' && !['admin', 'staff'].includes(u.role)) fail(403, 'Только для команды клуба');
     return u;
   };
-  const login = b => {
-    const u = get('users', b.user || '') || col('users').find(x => x.phone && x.phone === b.phone) || fail(404, 'Такого участника нет');
+  const startSession = u => {
     const tok = nid('s'); put('sessions', { id: tok, user: u.id });
     return { token: tok, me: meView(u) };
   };
@@ -320,16 +321,20 @@ window.KokoMock = function (SEED) {
   // ---- маршруты
   const R = {
     'GET /api/public': () => ({ config: CFG, events: col('events').map(e => eventView(e)).filter(e => e.state !== 'past').sort((a, b) => a.start < b.start ? -1 : 1),
-      media: col('media'), demo: col('users').filter(u => ['u_admin', 'u_anna', 'u_guest', 'u_s1'].includes(u.id)).map(u => ({ id: u.id, name: u.name, role: u.role })) }),
+      media: col('media') }),
     'POST /api/auth/register': (t, b) => {
       if (!(b.name || '').trim()) fail(400, 'Напишите, как к вам обращаться');
       if (!b.consent_pd || !b.consent_rules) fail(400, 'Чтобы зарегистрироваться, отметьте согласие на обработку персональных данных и правила клуба.');
       const promo = checkPromo(b.promo), stamp = iso(now());
       const u = put('users', { consents: { pd: stamp, rules: stamp, news: b.consent_news ? stamp : null, photo: null, social: null }, dm: 'known', promo, id: nid('u'), name: b.name.trim(), phone: b.phone || '', provider: b.provider || 'phone', role: 'guest', tier: null, tier_until: null,
         balance: 0, bonus_votes: 0, nfc: null, anketa: {}, hidden: [...CFG.anketa_hidden_default], entries_left: 0, joined: iso(now()), owned: [], online_until: null });
-      return login({ user: u.id });
+      return startSession(u);
     },
-    'POST /api/auth/login': (t, b) => login(b),
+    'POST /api/auth/login': (t, b) => {
+      const u = col('users').find(user => isPersonalProfile(user) && user.phone && user.phone === b.phone);
+      if (!u) fail(404, 'Такого участника нет');
+      return startSession(u);
+    },
     'GET /api/me': t => meView(auth(t)),
     'PUT /api/anketa': (t, b) => {
       const u = auth(t, 'resident'), before = progress(u);

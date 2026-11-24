@@ -143,7 +143,7 @@
     S.pub = await api('GET', '/api/public');
     S.cfg = S.pub.config;
     S.token = store.get('koko-token-' + S.mode);
-    if (S.token) { try { S.me = await api('GET', '/api/me'); } catch (e) { S.token = null; } }
+    if (S.token) { try { S.me = await api('GET', '/api/me'); } catch (e) { S.token = null; store.set('koko-token-' + S.mode, null); } }
     S.route = location.hash.slice(1); window.addEventListener('hashchange', () => { S.route = location.hash.slice(1); draw(); });
     draw();
   }
@@ -569,7 +569,6 @@
   ];
   function loginModal(tab) {
     const prov = ['VK ID', 'Яндекс ID', 'Сбер ID', 'T-ID'];
-    const roles = { u_admin: 'Слава — управляющий', u_anna: 'Анна — резидент', u_guest: 'Гость', u_s1: 'Даша — бармен' };
     const want = S.wantTier && S.cfg.tiers[S.wantTier];
     modal(`<h2 class="t-block">${tab === 'reg' ? 'Регистрация' : 'Вход в клуб'}</h2>
       <p class="t-small t-2">${want ? `После регистрации откроется оплата карты «${want.name}».` : 'Оставьте имя и телефон. Если вы у нас уже были, мы найдём вас по телефону.'}</p>
@@ -582,8 +581,7 @@
         <label class="check"><input type="checkbox" id="c-news" name="consent_news"><span>Хочу получать новости и анонсы клуба. Необязательно</span></label>
         ${DOCS.map(([t, body]) => `<details class="doc"><summary>${t}</summary><p>${body}</p></details>`).join('')}
         <div class="actions"><button class="btn primary">${want ? 'Продолжить к оплате' : 'Зарегистрироваться'}</button></div></form>
-      <div class="or"><span class="t-cap t-2">Или войдите через</span><div class="chips">${prov.map(p => `<button class="chip" data-act="oauth" data-p="${p}">${p}</button>`).join('')}</div></div>
-      <div class="or"><span class="t-cap t-2">Посмотреть сайт глазами</span><div class="chips">${S.pub.demo.map(d => `<button class="chip" data-act="demo" data-id="${d.id}">${roles[d.id] || esc(d.name)}</button>`).join('')}</div></div>`);
+      <div class="or"><span class="t-cap t-2">Или войдите через</span><div class="chips">${prov.map(p => `<button class="chip" data-act="oauth" data-p="${p}">${p}</button>`).join('')}</div></div>`);
   }
 
   // ---------------------------------------------------------------- бармен: сцена, уровень, диалог
@@ -1560,7 +1558,6 @@
     needres: el => A.resprice(el), payok: () => pay.done(true), payno: () => pay.done(false),
     scroll: el => { const t = document.getElementById(el.dataset.to); if (!t) { closeModal(); return go(S.me && !S.me.resident ? '' : el.dataset.to === 'afisha' ? 'afisha' : ''); } t.closest('details') && (t.closest('details').open = true); t && t.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth' }); },
     login: el => loginModal(el.dataset.tab), logout: () => { closeModal(); S.me = S.token = null; S.shownBal = null; S.wantTier = null; store.set('koko-token-' + S.mode, null); S.chat = []; go(''); },
-    demo: async el => { const r = await call('POST', '/api/auth/login', { user: el.dataset.id }); if (r) { S.wantTier = null; setSession(r); } },
     oauth: async el => { const f = $('.modal form'); if (!f.consent_pd.checked || !f.consent_rules.checked) return toast('Сначала отметьте согласие на обработку данных и правила клуба.');
       const r = await call('POST', '/api/auth/register', { name: 'Гость через ' + el.dataset.p, provider: el.dataset.p, consent_pd: 1, consent_rules: 1, consent_news: f.consent_news.checked ? 1 : 0 }); if (r) { setSession(r); afterAuth(); } },
     pop: () => { S.pop = !S.pop; draw(); },
