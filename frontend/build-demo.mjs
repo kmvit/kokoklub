@@ -1,16 +1,6 @@
-// Publish the standalone prototype as supplied, including its classic scripts.
-import { cp, mkdir, readdir, rename } from "node:fs/promises";
-
-const source = new URL("./demo/", import.meta.url);
-const output = new URL("./dist/", import.meta.url);
-await mkdir(output, { recursive: true });
-
-for (const name of await readdir(source)) {
-  if (name !== "index.html") {
-    await cp(new URL(name, source), new URL(name, output), { recursive: true });
-  }
+// Vite bundles the stylesheet and scripts. The original renderer also builds image URLs at runtime.
+import { cp } from "node:fs/promises";
+for (const dir of ["ds", "img", "hf", "fonts"]) {
+  await cp(new URL(`./demo/${dir}`, import.meta.url), new URL(`./dist/${dir}`, import.meta.url), { recursive: true });
 }
-const entry = new URL("index.html", output);
-const staged = new URL(".index-next.html", output);
-await cp(new URL("index.html", source), staged);
-await rename(staged, entry);
+await cp(new URL("./public/brand", import.meta.url), new URL("./dist/brand", import.meta.url), { recursive: true });

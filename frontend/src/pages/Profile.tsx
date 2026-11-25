@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { PageHeading } from "../components/ClubDesign";
 import ProjectEditor, { newProject, ProjectDirections } from "../components/ProjectEditor";
+import VisitPacks from "../components/VisitPacks";
 import Account from "../components/Account";
 import { Avatar, StatusDot, useToast } from "../components/ui";
 import { STATUS_LABEL, formatPhone, type Activity, type Me, type Status } from "../types";
@@ -105,7 +106,7 @@ export default function Profile() {
   return (
     <div className="page narrow">
       <PageHeading eyebrow="Личный кабинет / мой клуб" title="Личный кабинет" description="Ваш счёт, профиль и идеи — в одном месте." />
-      <Account />
+      <Account /><VisitPacks />
       <h2>Моя анкета</h2>
       <MembershipNotice me={me} />
 

@@ -1,6 +1,7 @@
 server {
     listen 80;
-    server_name b5971f2535c5.vps.myjino.ru;
+    include /etc/nginx/snippets/kokoklub-tls*.conf;
+    server_name b5971f2535c5.vps.myjino.ru clubcoco.ru;
     root /opt/kokoklub/frontend/dist;
     index index.html;
     client_max_body_size 20m;
@@ -25,5 +26,6 @@ server {
     location = /admin { return 301 /admin/; }
     location /static/ { alias /opt/kokoklub/backend/staticfiles/; }
     location /media/ { alias /opt/kokoklub/backend/media/; }
+    location /portal/ { try_files $uri $uri/ /portal/index.html; }
     location / { try_files $uri $uri/ /index.html; }
 }

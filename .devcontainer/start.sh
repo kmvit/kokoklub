@@ -8,7 +8,7 @@ mkdir -p .logs
 
 (cd backend && nohup python manage.py runserver "0.0.0.0:$BACKEND_PORT" > ../.logs/backend.log 2>&1 &)
 (cd frontend && VITE_API_PROXY="http://localhost:$BACKEND_PORT" \
-  nohup npx vite --host --port "$FRONTEND_PORT" --strictPort > ../.logs/frontend.log 2>&1 &)
+  nohup npm run dev -- --host --port "$FRONTEND_PORT" --strictPort > ../.logs/frontend.log 2>&1 &)
 
 # чтобы ссылкой можно было поделиться без входа в GitHub; если токену не хватает прав —
 # открыть порт вручную: вкладка Ports → 5180 → Port Visibility → Public

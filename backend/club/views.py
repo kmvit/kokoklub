@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from members.models import User
+from members.models import User, balance_expression
 from members.phone import normalize_phone
 from members.serializers import MemberShortSerializer, photo_url
 
@@ -36,8 +36,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
         ]
 
     def get_balance(self, obj):
-        from members.models import account_balance
-        return format(account_balance(obj), ".2f")
+        return format(obj.club_balance, ".2f")
 
     def get_photo(self, obj):
         return photo_url(obj)
@@ -49,7 +48,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
 
 def staff_members():
     qs = User.objects.select_related("activity").prefetch_related("cards")
-    return with_club_flags(qs)
+    return with_club_flags(qs).annotate(club_balance=balance_expression())
 
 
 def _member_data(member_id):
@@ -166,12 +165,16 @@ class ScanView(APIView):
 
         member = card.member
         with transaction.atomic():
+            User.objects.select_for_update().get(pk=member.pk)
             visit = open_visits().select_for_update().filter(member=member).first()
             if visit:
                 visit.left_at = timezone.now()
                 visit.save(update_fields=["left_at"])
                 action = "exit"
             else:
+                from .event_desk import admitted_today
+                if member.membership_sales.exists() and not admitted_today(member, timezone.localdate()):
+                    return Response({"action": "desk", "member_id": member.pk})
                 visit = Visit.objects.create(member=member, card=card)
                 action = "enter"
         return Response({"action": action, **_visit_data(visit)})

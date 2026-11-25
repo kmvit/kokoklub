@@ -5,6 +5,9 @@ import { useAuth } from "../../auth";
 import { Modal } from "../../components/ui";
 import { formatPhone, type StaffMember } from "../../types";
 import StaffTopUp from "./StaffTopUp";
+import StaffEventDesk from "./StaffEventDesk";
+import StaffMembership from "./StaffMembership";
+import StaffGuestArrivals from "./StaffGuestArrivals";
 import StaffPhoto from "./StaffPhoto";
 
 export default function GuestDetail() {
@@ -17,6 +20,7 @@ function GuestDetails({ id }: { id?: string }) {
   const [member, setMember] = useState<StaffMember | null>(null);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [arrivalRevision, setArrivalRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
 
@@ -24,6 +28,8 @@ function GuestDetails({ id }: { id?: string }) {
     if (!id) return;
     api.get<StaffMember>(`/staff/members/${id}/`).then(setMember).catch((e) => setError(e.message));
   }, [id]);
+
+  const updateBalance = (balance: string) => setMember(current => current && { ...current, balance });
 
   const toggleHidden = async () => {
     if (!member || busy) return;
@@ -66,13 +72,16 @@ function GuestDetails({ id }: { id?: string }) {
             {(member.activity || member.occupation) && <p className="muted">{[member.activity, member.occupation].filter(Boolean).join(" · ")}</p>}
             <div className="staff-guest-status">
               {member.in_club ? <span className="pill ok">Сейчас в клубе</span> : <span className="pill">Не в клубе</span>}
-              {member.card ? <span className="pill ok">Клубная карта активна</span> : <span className="pill warn">Нет действующей карты</span>}
+              {member.card ? <span className="pill ok">NFC-карта привязана</span> : <span className="pill warn">NFC-карта не привязана</span>}
             </div>
             {member.card && <p className="muted small">UID карты: {member.card.uid}</p>}
             {member.is_hidden && <p className="muted small">Скрыт из каталога участников</p>}
             <Link className="btn" to={`/staff/bind?member=${member.id}`}>{member.card ? "Перевыпустить карту" : "Привязать карту"}</Link>
+            <StaffEventDesk memberId={member.id} onEntry={() => { setMember(current => current && { ...current, in_club: true }); setArrivalRevision(n => n + 1); }} />
+            <StaffGuestArrivals memberId={member.id} />
+            <StaffMembership key={arrivalRevision} onBalance={updateBalance} memberId={member.id} onEntry={() => setMember(current => current && { ...current, in_club: true })} />
             {me && <StaffTopUp key={me.id} member={member} cashierId={me.id}
-              onBalance={(balance) => setMember((current) => current && { ...current, balance })} />}
+              onBalance={updateBalance} />}
             <div className="staff-guest-manage">
               <h2>Управление гостем</h2>
               <button className="btn btn-ghost" onClick={toggleHidden} disabled={busy}>{member.is_hidden ? "Показать в каталоге" : "Скрыть из каталога"}</button>

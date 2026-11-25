@@ -13,6 +13,9 @@ class Conversation(models.Model):
     # ровно одна переписка, кто бы ни написал первым.
     user_a = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     user_b = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    introduction_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.CASCADE, related_name="+")
+    consent = models.CharField(max_length=10, choices=[("pending", "Ожидает ответа"), ("accepted", "Принято"),
+                                                       ("declined", "Отложено")], default="pending")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now, db_index=True)
 

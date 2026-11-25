@@ -1,4 +1,4 @@
-export type ClubEvent = { id: number; title: string; description: string; starts_at: string; location: string };
+export type ClubEvent = { id: number; title: string; description: string; starts_at: string; location: string; accepts_pack: boolean; guest_seats: number; guest_extra: number; resident_seats: number; resident_price: number | null; invite_seats: number };
 
 const datePart = (value: string, options: Intl.DateTimeFormatOptions) =>
   new Date(value).toLocaleString("ru-RU", { ...options, timeZone: "Europe/Moscow" });

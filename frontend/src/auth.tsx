@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { await api.post("/auth/logout/", {}); } finally {
       clearTokens();
       setMe(null);
+      window.dispatchEvent(new Event("koko-logout"));
     }
   }, []);
 

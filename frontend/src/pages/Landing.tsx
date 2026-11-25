@@ -221,7 +221,7 @@ export default function Landing() {
               </div>
             </div>
             <div className="l-arch">
-              <img src="/img/lounge.jpg" alt="Гостиная клуба: кожаный диван, кресло, шахматы, камин и полки с винилом" />
+              <img src={`${import.meta.env.BASE_URL}img/lounge.jpg`} alt="Гостиная клуба: кожаный диван, кресло, шахматы, камин и полки с винилом" />
             </div>
           </div>
         </div>
@@ -295,7 +295,7 @@ export default function Landing() {
       <section className="l-dress reveal">
         <div className="l-dress-inner">
           <div className="l-dress-photo">
-            <img src="/img/vinyl.jpg" alt="Музыкальный угол: диджейский пульт, полки с пластинками и колонками" loading="lazy" />
+            <img src={`${import.meta.env.BASE_URL}img/vinyl.jpg`} alt="Музыкальный угол: диджейский пульт, полки с пластинками и колонками" loading="lazy" />
           </div>
           <div className="l-dress-text">
             <div className="l-num">Атмосфера</div>

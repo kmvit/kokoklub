@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -70,22 +71,44 @@ class ConversationView(APIView):
         return Response({
             "id": conv.id,
             "other": MemberShortSerializer(conv.other(me)).data,
+            "consent": conv.consent,
+            "intro_sent": conv.introduction_by_id is not None,
+            "can_decide": conv.introduction_by_id is not None and conv.introduction_by_id != me.pk,
             "messages": [_message_data(m, me) for m in messages],
         })
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        conv = get_object_or_404(Conversation.of(request.user).select_for_update(), pk=pk)
+        if not conv.introduction_by_id or conv.introduction_by_id == request.user.pk:
+            return Response({"detail": "Ответить может только получатель знакомства."}, status=403)
+        choice = request.data.get("consent")
+        if choice not in ("accepted", "declined"):
+            return Response({"detail": "Выберите ответ на знакомство."}, status=400)
+        if conv.consent != "accepted":
+            conv.consent = choice
+            conv.save(update_fields=["consent"])
+        return Response({"consent": conv.consent})
 
 
 class MessageCreateView(APIView):
     permission_classes = [IsClubUser]
+    @transaction.atomic
     def post(self, request, pk):
         me = request.user
         if denied := _require_member(me):
             return denied
-        conv = get_object_or_404(Conversation.of(me), pk=pk)
+        conv = get_object_or_404(Conversation.of(me).select_for_update(), pk=pk)
         text = str(request.data.get("text", "")).strip()
         if not text:
             return Response({"detail": "Пустое сообщение"}, status=400)
         if len(text) > MAX_TEXT:
             return Response({"detail": f"Сообщение длиннее {MAX_TEXT} символов"}, status=400)
+        if conv.consent != "accepted":
+            if conv.introduction_by_id:
+                return Response({"detail": "Для переписки нужно согласие на знакомство."}, status=409)
+            conv.introduction_by = me
+            conv.save(update_fields=["introduction_by"])
         msg = Message.objects.create(conversation=conv, sender=me, text=text)
         Conversation.objects.filter(pk=conv.pk).update(updated_at=msg.created_at)
         return Response(_message_data(msg, me), status=201)

@@ -94,3 +94,59 @@ class StaffTests(TestCase):
         )
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["phone"], "79005556677")
+
+
+class MembershipSaleTests(TestCase):
+    def test_paid_visit_offsets_one_sale(self):
+        staff = User.objects.create_user("79009992222", is_staff=True)
+        guest = User.objects.create_user("79009993333")
+        api = APIClient()
+        api.force_authenticate(staff)
+        url = f"/api/staff/members/{guest.pk}/membership/"
+        self.assertEqual(api.get(url).data["due"], 1500)
+        entry = api.post(url, {"action": "entry"}, format="json").data
+        self.assertEqual(entry["due"], 500)
+        api.post(url, {"action": "entry"}, format="json")
+        self.assertEqual(guest.visits.count(), 1)
+        purchase = {"action": "month", "entry_id": entry["entry_id"], "paid": 500}
+        self.assertEqual(api.post(url, purchase, format="json").status_code, 200)
+        api.post(url, purchase, format="json")
+        self.assertEqual(guest.membership_sales.count(), 1)
+        self.assertTrue(guest.is_member)
+
+    def test_prior_day_payment_and_expired_quote(self):
+        staff = User.objects.create_user("79009992222", is_staff=True)
+        guest = User.objects.create_user("79009993333")
+        api = APIClient()
+        url = f"/api/staff/members/{guest.pk}/membership/"
+        api.force_authenticate(guest)
+        self.assertEqual(api.post(url, {"action": "entry"}).status_code, 403)
+        api.force_authenticate(staff)
+        entry = api.post(url, {"action": "entry"}, format="json").data
+        guest.visits.update(entered_at=timezone.now() - timedelta(days=1))
+        self.assertEqual(api.get(url).data["due"], 1500)
+        purchase = {"action": "month", "entry_id": entry["entry_id"], "paid": 500}
+        self.assertEqual(api.post(url, purchase, format="json").status_code, 409)
+        self.assertFalse(guest.is_member)
+
+    def test_longer_tariffs_keep_the_quoted_price_and_duration(self):
+        staff = User.objects.create_user("79009994444", is_staff=True)
+        api = APIClient()
+        api.force_authenticate(staff)
+        for code, full, days, phone in [
+            ("half", 7500, 182, "79009995555"),
+            ("year", 15000, 365, "79009996666"),
+        ]:
+            with self.subTest(code=code):
+                guest = User.objects.create_user(phone)
+                url = f"/api/staff/members/{guest.pk}/membership/"
+                self.assertEqual(api.get(url).data["tariffs"][code]["due"], full)
+                quote = api.post(url, {"action": "entry"}, format="json").data
+                purchase = {"action": code, "entry_id": quote["entry_id"], "paid": full - 1000}
+                self.assertEqual(api.post(url, {**purchase, "paid": 500}, format="json").status_code, 409)
+                for _ in range(2):
+                    self.assertEqual(api.post(url, purchase, format="json").status_code, 200)
+                sale = guest.membership_sales.get()
+                self.assertEqual((sale.tariff, sale.paid), (code, full - 1000))
+                self.assertEqual(sale.ends_at - sale.starts_at, timedelta(days=days))
+                self.assertEqual(api.post(url, {**purchase, "action": "month"}, format="json").status_code, 409)

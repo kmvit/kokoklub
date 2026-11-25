@@ -115,8 +115,13 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_member(self) -> bool:
-        """Член клуба — тот, у кого привязана действующая карта."""
-        return not self.is_staff and self.cards.filter(is_active=True).exists()
+        """Для оформленных тарифов проверяем срок, для прежних карт — активную метку."""
+        if self.is_staff:
+            return False
+        latest = self.membership_sales.order_by("-ends_at").values_list("ends_at", flat=True).first()
+        if latest is not None:
+            return latest > timezone.now()
+        return self.cards.filter(is_active=True).exists()
 
     @property
     def profile_complete(self) -> bool:
@@ -124,6 +129,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Project(models.Model):
+    helpers = models.ManyToManyField(User, related_name="helped_projects", blank=True)
+    exchange = models.CharField(max_length=240, blank=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
     title = models.CharField("название", max_length=150)
     description = models.TextField("описание", blank=True, max_length=5000)
@@ -163,6 +170,15 @@ def delete_project_image_file(sender, instance, **kwargs):
 
 
 class Event(models.Model):
+    accepts_pack = models.BooleanField("можно оплатить собственное место одним визитом", default=False)
+    guest_seats = models.PositiveIntegerField("мест для гостей по записи", default=0)
+    guest_extra = models.PositiveIntegerField("доплата гостя за программу в токенах", default=0)
+    organizer = models.ForeignKey(User, verbose_name="организатор своей встречи", null=True, blank=True,
+                                  limit_choices_to={"is_staff": False}, on_delete=models.PROTECT)
+    cancelled_at = models.DateTimeField(null=True, editable=False)
+    resident_seats = models.PositiveIntegerField("мест для самостоятельной брони резидентов", default=0)
+    resident_price = models.PositiveIntegerField("цена места резидента в токенах", null=True, blank=True)
+    invite_seats = models.PositiveIntegerField("мест по пригласительным", default=0)
     title = models.CharField("название", max_length=150)
     description = models.TextField("описание", blank=True)
     starts_at = models.DateTimeField("начало")
@@ -189,7 +205,245 @@ class TopUp(models.Model):
         constraints = [models.CheckConstraint(check=models.Q(amount__gt=0), name="topup_positive")]
 
 
-def account_balance(user):
+class PartnerCode(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.PROTECT)
+    code = models.SlugField("промокод", unique=True)
+    limit = models.PositiveIntegerField("число использований")
+    enabled = models.BooleanField("действует", default=True)
+
+    class Meta:
+        verbose_name = "промокод организатора"
+        verbose_name_plural = "промокоды организаторов"
+
+
+class ResidentBooking(models.Model):
+    package_sale = models.ForeignKey("club.MembershipSale", related_name="package_bookings", null=True, on_delete=models.PROTECT)
+    guest = models.BooleanField(default=False)
+    guest_entry = models.PositiveIntegerField(default=0)
+    partner_code = models.ForeignKey(PartnerCode, null=True, on_delete=models.PROTECT)
+    visit = models.ForeignKey("club.Visit", null=True, on_delete=models.PROTECT)
+    checked_in_by = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name="+")
+    member = models.ForeignKey(User, related_name="resident_bookings", on_delete=models.PROTECT)
+    event = models.ForeignKey(Event, related_name="resident_bookings", on_delete=models.PROTECT)
+    price = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    cancelled_at = models.DateTimeField(null=True)
+    refunded = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["member", "event"], condition=models.Q(cancelled_at__isnull=True),
+                                                name="one_active_resident_booking")]
+
+
+def balance_expression():
     from decimal import Decimal
-    from django.db.models import Sum
-    return user.topups.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    from django.db.models.functions import Coalesce
+
+    def total(query, field, owner="member"):
+        sums = query.filter(**{owner: models.OuterRef("pk")}).order_by().values(owner).annotate(value=models.Sum(field))
+        return Coalesce(models.Subquery(sums.values("value")), models.Value(Decimal("0.00")),
+                        output_field=models.DecimalField(max_digits=20, decimal_places=2))
+
+    from club.models import GuestBooking, MembershipSale, PackPurchase, WalkIn
+    return (total(OnlinePayment.objects.filter(confirmed_at__isnull=False, purpose="topup"), "amount")
+            + total(OnlinePayment.objects.filter(purpose="gift_tokens", redeemed_at__isnull=False), "amount", "redeemed_by")
+            - total(ShopOrder.objects.all(), "price")
+            + total(MembershipSale.objects.filter(starts_at__lte=timezone.now()), "credit_grant") - total(PackPurchase.objects.all(), "price")
+            + total(TopUp.objects.all(), "amount") - total(ResidentBooking.objects.filter(refunded=False), "price")
+            - total(RecordingPurchase.objects.all(), "price")
+            - total(WalkIn.objects.all(), "price")
+            - total(GuestBooking.objects.filter(refunded=False), "price", "sale__member"))
+
+
+def account_balance(user):
+    return User.objects.filter(pk=user.pk).annotate(balance=balance_expression()).values_list("balance", flat=True).get()
+
+
+class MeetingProposal(models.Model):
+    class Stage(models.TextChoices):
+        NEW = "new", "На рассмотрении"
+        OPEN = "open", "Сбор интереса"
+        DECLINED = "declined", "Отклонена"
+
+    author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    contact = models.CharField("как связаться с автором", max_length=200)
+    title = models.CharField("тема", max_length=150)
+    description = models.TextField("описание", max_length=2400)
+    stage = models.CharField("статус", max_length=12, choices=Stage.choices, default=Stage.NEW)
+    interested = models.ManyToManyField(User, related_name="meeting_interests", blank=True)
+    review = models.CharField("ответ команды", max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    event = models.OneToOneField(Event, null=True, blank=True, on_delete=models.PROTECT, verbose_name="встреча в афише")
+
+    class Meta:
+        verbose_name = "заявка на встречу"
+        verbose_name_plural = "заявки на встречи"
+
+    def __str__(self):
+        return self.title
+
+
+class ClubPost(models.Model):
+    title = models.CharField(max_length=140, blank=True)
+    poll_choices = models.JSONField(default=list, blank=True)
+    poll_question = models.CharField(max_length=140, blank=True)
+    likes = models.ManyToManyField(User, related_name="+", blank=True)
+    respondents = models.ManyToManyField(User, related_name="+", blank=True)
+    pinned = models.BooleanField(default=False)
+
+    class Kind(models.TextChoices):
+        NOTE = "note", "Обсуждение"
+        OFFER = "offer", "Свои для своих"
+        POLL = "poll", "Голосование"
+
+    author = models.ForeignKey(User, on_delete=models.PROTECT)
+    kind = models.CharField(max_length=12, choices=Kind.choices)
+    text = models.TextField(max_length=2400)
+    created_at = models.DateTimeField(auto_now_add=True)
+    visible = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "публикация клуба"
+        verbose_name_plural = "публикации клуба"
+
+
+class PollVote(models.Model):
+    option = models.PositiveSmallIntegerField(null=True)
+    post = models.ForeignKey(ClubPost, on_delete=models.CASCADE, related_name="votes")
+    member = models.ForeignKey(User, on_delete=models.CASCADE)
+    support = models.BooleanField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["post", "member"], name="one_club_poll_vote")]
+
+
+class Recording(models.Model):
+    title = models.CharField("название", max_length=150)
+    url = models.URLField("ссылка для просмотра")
+    price = models.PositiveIntegerField("цена для гостя в токенах")
+    published = models.BooleanField("опубликовано", default=False)
+
+    class Meta:
+        verbose_name = "запись клуба"
+        verbose_name_plural = "записи клуба"
+
+
+class RecordingPurchase(models.Model):
+    member = models.ForeignKey(User, on_delete=models.PROTECT, related_name="recording_purchases")
+    recording = models.ForeignKey(Recording, on_delete=models.PROTECT)
+    price = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["recording", "member"], name="one_recording_purchase")]
+
+
+class OnlinePayment(models.Model):
+    purpose = models.CharField(max_length=24, default="topup")
+    card_quote = models.JSONField(default=dict, blank=True)
+    gift_code = models.CharField(max_length=40, unique=True, null=True)
+    redeemed_by = models.ForeignKey(User, related_name="redeemed_gifts", null=True, on_delete=models.PROTECT)
+    redeemed_at = models.DateTimeField(null=True)
+
+    member = models.ForeignKey(User, on_delete=models.PROTECT, related_name="online_payments")
+    order_id = models.UUIDField(unique=True, editable=False)
+    reference = models.UUIDField()
+    amount = models.PositiveIntegerField("сумма пополнения в рублях")
+    payment_id = models.CharField(max_length=32, null=True, unique=True)
+    payment_url = models.URLField(max_length=1000, blank=True)
+    status = models.CharField(max_length=32, default="CREATED")
+    confirmed_at = models.DateTimeField(null=True)
+    needs_review = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["member", "reference"], name="one_checkout_per_reference")]
+        verbose_name = "онлайн-пополнение"
+        verbose_name_plural = "онлайн-пополнения"
+
+
+class ShelfItem(models.Model):
+    class Kind(models.TextChoices):
+        VINYL = "vinyl", "Пластинка"
+        FILM = "film", "Фильм"
+        BOOK = "book", "Книга"
+
+    kind = models.CharField(max_length=8, choices=Kind.choices)
+    title = models.CharField(max_length=120)
+    by = models.CharField("автор", max_length=80, blank=True)
+    in_collection = models.BooleanField("в коллекции", default=True)
+    suggested_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    supporters = models.ManyToManyField(User, related_name="shelf_wishes", blank=True)
+
+    def __str__(self):
+        return self.title
+
+
+class ShelfBallot(models.Model):
+    event = models.OneToOneField(Event, on_delete=models.CASCADE)
+    kind = models.CharField(max_length=8, choices=ShelfItem.Kind.choices)
+
+
+class ShelfChoice(models.Model):
+    ballot = models.ForeignKey(ShelfBallot, on_delete=models.CASCADE)
+    member = models.ForeignKey(User, on_delete=models.CASCADE)
+    item = models.ForeignKey(ShelfItem, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["ballot", "member"], name="one_choice_per_library_evening")]
+
+
+class ClubQuestionnaire(models.Model):
+    member = models.OneToOneField(User, related_name="questionnaire", on_delete=models.CASCADE)
+    answers = models.JSONField(default=dict)
+    hidden = models.JSONField(default=list)
+    meet_on = models.DateField(null=True)
+
+
+class Discussion(models.Model):
+    topic = models.SlugField(max_length=40)
+    title = models.CharField(max_length=140)
+    author = models.ForeignKey(User, on_delete=models.PROTECT)
+    post = models.OneToOneField(ClubPost, blank=True, null=True, on_delete=models.CASCADE)
+    pinned = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class DiscussionReply(models.Model):
+    discussion = models.ForeignKey(Discussion, related_name="replies", on_delete=models.CASCADE)
+    author = models.ForeignKey(User, on_delete=models.PROTECT)
+    text = models.TextField(max_length=2000)
+    reply_to = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL)
+    hidden = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    likes = models.ManyToManyField(User, related_name="+", blank=True)
+    reports = models.ManyToManyField(User, related_name="+", blank=True)
+
+
+class TopicPreference(models.Model):
+    topic = models.SlugField(max_length=40)
+    member = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["topic", "member"], name="one_topic_preference")]
+
+
+class ShopProduct(models.Model):
+    title = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    price = models.PositiveIntegerField()
+    available = models.BooleanField(default=True)
+    requires_portrait = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.title
+
+
+class ShopOrder(models.Model):
+    member = models.ForeignKey(User, related_name="shop_orders", on_delete=models.PROTECT)
+    product = models.ForeignKey(ShopProduct, on_delete=models.PROTECT)
+    title = models.CharField(max_length=120)
+    price = models.PositiveIntegerField()
+    reference = models.UUIDField(unique=True)
+    status = models.CharField(max_length=10, choices=[("ordered","Принят"),("ready","Готов"),("issued","Выдан")], default="ordered")
+    created_at = models.DateTimeField(auto_now_add=True)

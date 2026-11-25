@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
 import { stopEntranceNfc } from "./entranceNfc";
 import Layout from "./components/Layout";
+import Community from "./pages/Community";
 import Catalog from "./pages/Catalog";
 import Chat from "./pages/Chat";
 import Chats from "./pages/Chats";
@@ -50,6 +51,7 @@ export default function App() {
     <><EntranceScanBoundary /><Routes>
       <Route element={<Layout />}>
         <Route index element={<Home />} />
+        <Route path="club" element={<RequireAuth><Community /></RequireAuth>} />
         <Route path="afisha" element={<Afisha />} />
         <Route path="projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
         <Route path="projects" element={<RequireAuth><Projects /></RequireAuth>} />

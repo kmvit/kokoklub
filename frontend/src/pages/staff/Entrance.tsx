@@ -44,7 +44,8 @@ export default function Entrance() {
 
   useCardReader(async (uid) => {
     try {
-      const res = await api.post<InsideVisit & { action: "enter" | "exit" }>("/staff/scan/", { uid });
+      const res = await api.post<(InsideVisit & { action: "enter" | "exit" }) | { action: "desk"; member_id: number }>("/staff/scan/", { uid });
+      if (res.action === "desk") { navigate(`/staff/guests/${res.member_id}`); return; }
       setResult({ kind: res.action, name: res.member.full_name.split(" ")[0] || "гость", photo: res.member.photo });
     } catch (e) {
       setResult({ kind: "error", text: (e as Error).message });

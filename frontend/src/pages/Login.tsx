@@ -44,7 +44,7 @@ export default function Login() {
 
   return (
     <div className="page auth-layout">
-      <aside className="auth-welcome"><img src="/img/vinyl.jpg" alt="Виниловые пластинки в клубе" width="1200" height="1600" /><div><Link to="/">Вернуться в клуб</Link><h2>Хорошо, когда<br />есть свои.</h2><p>Знакомьтесь, делитесь идеями<br />и находите повод встретиться.</p></div></aside>
+      <aside className="auth-welcome"><img src={`${import.meta.env.BASE_URL}img/vinyl.jpg`} alt="Виниловые пластинки в клубе" width="1200" height="1600" /><div><Link to="/">Вернуться в клуб</Link><h2>Хорошо, когда<br />есть свои.</h2><p>Знакомьтесь, делитесь идеями<br />и находите повод встретиться.</p></div></aside>
       <div className="card auth-card">
         <div className="auth-tabs" aria-label="Вход или регистрация"><button type="button" aria-pressed={!register} onClick={() => { setParams({}); setError(""); }}>Войти</button><button type="button" aria-pressed={register} onClick={() => { setParams({ mode: "register" }); setError(""); }}>Регистрация</button></div>
         <h1>{register ? "Регистрация в клубе" : "Вход в клуб"}</h1>

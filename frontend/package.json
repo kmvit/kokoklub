@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite demo --config vite.config.ts",
-    "build": "node build-demo.mjs",
+    "build": "tsc && vite build demo --config vite.config.ts --outDir ../dist --emptyOutDir && vite build --base=/portal/ --outDir dist/portal && node build-demo.mjs",
     "preview": "vite preview",
     "build:portal": "tsc && vite build",
     "dev:portal": "vite"

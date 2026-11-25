@@ -22,13 +22,13 @@ export default function ClubCover({ firstName, target }: { firstName?: string; t
   return <section className="edition-cover" aria-labelledby="cover-title">
     <div className="edition-mast">
       <div className="edition-date"><strong>{part("day")}</strong><span>{part("month")}<br />{part("weekday")}</span></div>
-      <img src="/brand/koko_E_mark_on-green.svg" width="56" height="56" alt="" />
+      <img src={`${import.meta.env.BASE_URL}brand/koko_E_mark_on-green.svg`} width="56" height="56" alt="" />
       <span>Пятигорск</span>
     </div>
     <div className="edition-rule">Клуб Коко</div>
     <div className="edition-grid">
       <figure className="edition-gallery">
-        <div className="edition-art"><img src={`/brand/art/${file}`} className={slide === 0 ? "chandelier" : undefined} alt="" fetchPriority="high" /></div>
+        <div className="edition-art"><img src={`${import.meta.env.BASE_URL}brand/art/${file}`} className={slide === 0 ? "chandelier" : undefined} alt="" fetchPriority="high" /></div>
         <div className="edition-dots" role="group" aria-label="Что есть в клубе">
           {slides.map(([, label], i) => <button key={label} type="button" aria-label={label} aria-pressed={i === slide} onClick={() => setSlide(i)} />)}
         </div>

@@ -185,3 +185,14 @@ MENU_URL = os.getenv("MENU_URL", "https://demo.padacha.ru/")
 # ночи, всё ещё «в клубе». Незакрытые визиты прошлого дня считаются
 # завершёнными — забыть приложить карту на выходе можно.
 CLUB_DAY_START_HOUR = int(os.getenv("CLUB_DAY_START_HOUR", "6"))
+
+# Серверные параметры интернет-эквайринга. Без терминала онлайн-оплата скрыта.
+TBANK_TERMINAL = os.getenv("TBANK_TERMINAL", "")
+TBANK_PASSWORD = os.getenv("TBANK_PASSWORD", "")
+TBANK_PUBLIC_ORIGIN = os.getenv("TBANK_PUBLIC_ORIGIN", "").rstrip("/")
+TBANK_TEST = os.getenv("TBANK_TEST", "1") == "1"
+TBANK_API_TOKEN = os.getenv("TBANK_API_TOKEN", "")
+TBANK_TAXATION = os.getenv("TBANK_TAXATION", "")
+TBANK_ITEM_TAX = os.getenv("TBANK_ITEM_TAX", "")
+
+TBANK_RETURN_PATH = os.getenv("TBANK_RETURN_PATH", "/#cabinet")

@@ -1,10 +1,11 @@
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
-from rest_framework import generics
+from rest_framework import generics, serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,6 +14,7 @@ from club.queries import with_club_flags
 
 from .permissions import IsClubUser, CanAccessOwnProfile
 from .images import shrink_photo
+from .payments import enabled as online_payments_enabled
 from .models import Activity, Hobby, User, Project, ProjectImage, Event, TopUp, account_balance
 from .serializers import (
     ActivitySerializer,
@@ -74,7 +76,12 @@ class SiteView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        return Response({"menu_url": settings.MENU_URL or None})
+        from club.membership import TARIFFS
+
+        return Response({"menu_url": settings.MENU_URL or None, "tariffs": {
+            key: {"name": key.label, "price": price, "days": days}
+            for key, (price, days) in TARIFFS.items()
+        }})
 
 
 class ActivityListView(generics.ListAPIView):
@@ -144,8 +151,12 @@ class EventsView(APIView):
 
     def get(self, request):
         from django.utils import timezone
-        return Response(list(Event.objects.filter(is_published=True, starts_at__gte=timezone.now()).values(
-            "id", "title", "description", "starts_at", "location",
+        return Response(list(Event.objects.filter(is_published=True, cancelled_at__isnull=True, starts_at__gte=timezone.now()).annotate(
+            resident_free=F("resident_seats") - Count("resident_bookings", filter=Q(resident_bookings__guest=False, resident_bookings__cancelled_at__isnull=True), distinct=True),
+            guest_free=F("guest_seats") - Count("resident_bookings", filter=Q(resident_bookings__guest=True, resident_bookings__cancelled_at__isnull=True), distinct=True),
+            invite_free=F("invite_seats") - Count("guest_bookings", filter=Q(guest_bookings__cancelled_at__isnull=True), distinct=True),
+        ).values("resident_free", "guest_free", "invite_free",
+            "id", "title", "description", "starts_at", "location", "invite_seats", "resident_seats", "resident_price", "guest_seats", "guest_extra", "accepts_pack",
         )))
 
 
@@ -161,6 +172,38 @@ class ProjectsView(APIView):
     permission_classes = [IsClubUser]
     def get(self, request):
         return Response(ClubProjectSerializer(visible_projects(), many=True).data)
+
+
+class ProjectTeams(APIView):
+    permission_classes = [IsClubUser]
+
+    def get(self, request):
+        return Response([{"id":p.pk,"title":p.title,"about":p.description or p.summary,"need":p.looking_for,
+                          "give":p.exchange,"owner_name":p.owner.full_name,"status":p.get_stage_display() or "Идея",
+                          "members":[p.owner_id] + [u.pk for u in p.helpers.all()],
+                          "member_names":[p.owner.full_name] + [u.full_name for u in p.helpers.all() if not u.is_hidden and u.is_active]}
+                         for p in visible_projects().prefetch_related("helpers")])
+
+    @transaction.atomic
+    def post(self, request, pk=None):
+        if not request.user.is_member:
+            return Response({"detail":"Проекты ведут резиденты."},status=403)
+        if pk:
+            project = get_object_or_404(visible_projects(),pk=pk)
+            if project.owner_id != request.user.pk:
+                project.helpers.add(request.user)
+        else:
+            class Input(serializers.Serializer):
+                title = serializers.CharField(max_length=150)
+                about = serializers.CharField(max_length=5000,allow_blank=True,default="")
+                need = serializers.CharField(max_length=300,allow_blank=True,default="")
+                give = serializers.CharField(max_length=240,allow_blank=True,default="")
+            data = Input(data=request.data)
+            data.is_valid(raise_exception=True)
+            args = data.validated_data
+            project = Project.objects.create(owner=request.user,title=args["title"],description=args["about"],summary=args["about"][:240],
+                                             looking_for=args["need"],exchange=args["give"],stage=Project.Stage.IDEA)
+        return Response({"id":project.pk})
 
 
 class ProjectDetailView(APIView):
@@ -209,7 +252,27 @@ class AccountView(APIView):
     permission_classes = [IsClubUser]
     @method_decorator(never_cache)
     def get(self, request):
+        from club.event_desk import reward_status
+        from club.membership import status as membership_status
+        from club.models import GuestBooking
+        guest_paid = GuestBooking.objects.filter(sale__member=request.user)
         return Response({
             "balance": format(account_balance(request.user), ".2f"),
+            "membership": membership_status(request.user),
+            "organizer_rewards": reward_status(request.user),
+            "online_enabled": online_payments_enabled(),
+            "merch": list(request.user.shop_orders.values("id","title","price","created_at").order_by("-pk")[:100]),
+            "gifts": list(request.user.redeemed_gifts.filter(purpose="gift_tokens").values("id","amount","redeemed_at").order_by("-redeemed_at")[:100]),
+            "online": list(request.user.online_payments.filter(purpose="topup").order_by("-created_at").values("order_id", "amount", "confirmed_at", "status", "needs_review")[:100]),
+            "guest_charges": list(guest_paid.order_by("-created_at").values("id", "event__title", "price", "payment", "created_at")[:100]),
+            "guest_refunds": list(guest_paid.filter(refunded=True).order_by("-cancelled_at").values("id", "event__title", "price", "payment", "cancelled_at")[:100]),
+            "walkins": list(request.user.walkins.order_by("-created_at").values("id", "price", "created_at", "package_sale_id")[:100]),
+            "packs": list(request.user.pack_purchases.order_by("-created_at").values("id", "price", "visits", "created_at")[:100]),
+            "card_grants": list(request.user.membership_sales.filter(credit_grant__gt=0, starts_at__lte=timezone.now()).order_by("-starts_at").values("id", "credit_grant", "starts_at")[:100]),
+            "recordings": list(request.user.recording_purchases.order_by("-created_at").values("id", "recording__title", "created_at", "price")[:100]),
+            "charges": list(request.user.resident_bookings.order_by("-created_at").values(
+                "id", "event__title", "price", "package_sale_id", "created_at")[:100]),
+            "refunds": list(request.user.resident_bookings.filter(refunded=True).order_by("-cancelled_at").values(
+                "id", "event__title", "price", "package_sale_id", "cancelled_at")[:100]),
             "topups": list(request.user.topups.values("id", "amount", "created_at")[:100]),
         })

@@ -21,6 +21,9 @@ class ChatTests(TestCase):
         self.assertEqual(boris.post("/api/chats/", {"member": self.anna.pk}, format="json").data["id"], conv)
 
         anna.post(f"/api/chats/{conv}/messages/", {"text": "Привет! Нужен сайт"}, format="json")
+        self.assertEqual(anna.post(f"/api/chats/{conv}/messages/", {"text": "Повтор"}).status_code, 409)
+        self.assertEqual(anna.patch(f"/api/chats/{conv}/", {"consent": "accepted"}).status_code, 403)
+        self.assertEqual(boris.patch(f"/api/chats/{conv}/", {"consent": "accepted"}).status_code, 200)
         anna.post(f"/api/chats/{conv}/messages/", {"text": "Есть время?"}, format="json")
         self.assertEqual(boris.get("/api/me/").data["unread"], 2)
         self.assertEqual(boris.get("/api/chats/").data[0]["unread"], 2)

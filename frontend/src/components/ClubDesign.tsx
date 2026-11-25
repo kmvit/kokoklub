@@ -5,5 +5,5 @@ export function PageHeading({ eyebrow, title, description, action }: { eyebrow: 
 }
 
 export function ClubEmpty({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="club-empty"><img src="/brand/koko_E_mark_on-green.svg" width="48" height="48" alt="" /><div><h2>{title}</h2><div className="muted">{children}</div></div></div>;
+  return <div className="club-empty"><img src={`${import.meta.env.BASE_URL}brand/koko_E_mark_on-green.svg`} width="48" height="48" alt="" /><div><h2>{title}</h2><div className="muted">{children}</div></div></div>;
 }

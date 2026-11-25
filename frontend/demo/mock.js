@@ -131,13 +131,10 @@ window.KokoMock = function (SEED) {
   const useFree = (u, k = 1) => { let fm = u.free_month || {}; if (fm.m !== month()) fm = { m: month(), n: 0 }; fm.n = Math.max(0, fm.n + k); u.free_month = fm; };
   const offerOf = u => {
     if (u.tier || u.role !== 'guest') return null;
-    // День посещения — сегодня гость прошёл на кассе или у него бронь на сегодняшний вечер. Засчитываем то, что он заплатил за вход:
-    // 1 000 ₽ или цену по промокоду. Бронь на другой день зачёта не даёт.
     const today = iso(now()).slice(0, 10);
-    const paid = Math.max(0, ...col('tx').filter(x => x.user === u.id && x.kind === 'guest' && x.visit && x.ts.slice(0, 10) === today).map(x => Math.max(x.rub, -x.credits)),
-      ...col('bookings').filter(k => k.user === u.id && k.guest && (get('events', k.event) || { start: '' }).start.slice(0, 10) === today).map(k => Math.round(k.paid / (k.size || 1))));
-    if (!paid) return null;
-    const cr = Math.min(CFG.first_visit_offer.credit, paid);   // гостевой вход засчитывается в любую карту, только в день визита
+    const entries = col('tx').filter(x => x.user === u.id && x.kind === 'guest' && x.visit && x.ts.slice(0, 10) === today);
+    const cr = Math.max(0, ...entries.map(x => x.entry_paid ?? Math.max(x.rub || 0, -(x.credits || 0))));
+    if (!cr) return null;
     return { credit: cr, cards: Object.entries(CFG.tiers).map(([k, t]) => ({ tier: k, name: t.name, full: t.price, price: t.price - cr })) };
   };
   // Строка истории счёта: credits — кредиты, rub — деньги и где заплачены (via), days и inv — визиты и пригласительные; bal и left — что осталось после.
@@ -557,7 +554,7 @@ window.KokoMock = function (SEED) {
         if (v.deposit_back) { u.balance += v.deposit_back; put('users', u); tx(u, { credits: v.deposit_back, kind: 'refund', note: `Депозит брони: ${v.deposit_back} на счёт для бара` }); }   // депозит вечерней брони по коду: сверх входа — на счёт
         if (v.how === 'promo') usePromo(u, v.my_price - v.deposit_back);
       }
-      put('bookings', { id: nid('b'), user: u.id, event: id, paid, cur, balcony: spot ? spot.k : null, seats, size, used_entry: used, used_free: usedFree, used_invite: usedGuest, guest: !isRes(u), deposit: v.deposit_back, arrived: false, burned: false, ts: iso(now()) });
+      put('bookings', { id: nid('b'), user: u.id, event: id, paid, cur, balcony: spot ? spot.k : null, seats, size, used_entry: used, used_free: usedFree, used_invite: usedGuest, guest: !isRes(u), entry_paid: isRes(u) ? 0 : v.my_price - v.deposit_back - (v.how === 'promo' ? extra : (e.extra_guest ?? extra)), deposit: v.deposit_back, arrived: false, burned: false, ts: iso(now()) });
       return { me: meView(get('users', u.id)), paid, cur, used_entry: used, used_free: usedFree, used_invite: usedGuest, balcony: !!spot };
     },
     'DELETE /api/events/:id/book': (t, b, id) => {
@@ -831,7 +828,20 @@ window.KokoMock = function (SEED) {
       let u = get('users', b.user || '') || col('users').find(x => x.nfc && x.nfc === b.nfc) || fail(404, 'Карта не найдена');
       const today = iso(now()).slice(0, 10);
       const bk = col('bookings').find(k => k.user === u.id && get('events', k.event).start.slice(0, 10) === today);
-      if (bk) return { name: u.name, text: 'Вход по брони, уже оплачен', balance: u.balance };
+      if (bk) {
+        if (!bk.arrived) {
+          bk.arrived = true;
+          put('bookings', bk);
+          if (bk.guest && bk.cur !== 'door') {
+            const event = get('events', bk.event);
+            // Старые брони хранят общий платёж за все места.
+            const extra = event.extra_guest ?? event.extra ?? 0;
+            const priorEntry = bk.paid - (bk.deposit || 0) - ((bk.size || 1) - 1) * (CFG.entry.guest + extra) - extra;
+            tx(u, { kind: 'guest', visit: true, entry_paid: Math.max(0, bk.entry_paid ?? priorEntry), note: 'Приход по оплаченной брони' });
+          }
+        }
+        return { name: u.name, text: 'Вход по брони, уже оплачен', balance: u.balance };
+      }
       if (b.mode === 'day') { put('visits', { id: nid('s'), user: u.id, name: u.name, ts: iso(now()), status: 'open' }); return { name: u.name, text: 'Выданы песочные часы: первые полчаса бесплатно', balance: u.balance }; }
       const ev = col('events').filter(e => e.start.slice(0, 10) === today).sort((a, b) => a.start < b.start ? -1 : 1)[0];
       if (ev && eventView(ev, u).free <= 0) return { name: u.name, text: 'Зал полон: свободных мест на вечер нет.', balance: u.balance };

@@ -1,0 +1,13 @@
+#club-workspace :is(.form,.field,form, .staff-guest-manage,.account-history,.page){display:grid;gap:var(--s4);min-width:0}
+#club-workspace .page{gap:var(--s5)}
+#club-workspace h1{font:inherit;font-family:"Poiret One",sans-serif;font-size:clamp(2rem,5vw,4rem)}
+#club-workspace :is(.staff-tabs,.actions,.filters,.modal-actions,.auth-tabs,.profile-actions){display:flex;flex-wrap:wrap;gap:var(--s3);align-items:center}
+#club-workspace :is(.staff-tabs,.profile-section,.account-history-panel){padding-block:var(--s4)}
+#club-workspace :is(input:not([type=checkbox]):not([type=file]),textarea,select){max-width:100%;padding:.65em;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px}
+#club-workspace label{display:grid;gap:.35em}
+#club-workspace :is(.modal-panel,.modal-card){background:#f4ead9;color:#30271e;max-height:85vh;overflow:auto;padding:var(--s5);width:min(92vw,520px)}
+#club-workspace .staff-tab-mobile{display:none}
+#club-workspace .account-history li{display:flex;gap:1em;flex-wrap:wrap}
+#club-workspace .avatar,.guest-photo img{object-fit:cover;border-radius:50%}
+#club-workspace .pre{white-space:pre-wrap}
+#club-workspace .sr-only{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}

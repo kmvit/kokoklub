@@ -9,6 +9,9 @@ interface Conversation {
   id: number;
   other: MemberShort;
   messages: ChatMessage[];
+  consent: "accepted" | "pending" | "declined";
+  intro_sent: boolean;
+  can_decide: boolean;
 }
 
 // Пока без онлайна: новые сообщения подтягиваются при открытии,
@@ -49,7 +52,7 @@ export default function Chat() {
     setSending(true);
     try {
       const msg = await api.post<ChatMessage>(`/chats/${id}/messages/`, { text });
-      setConv({ ...conv, messages: [...conv.messages, msg] });
+      setConv({ ...conv, intro_sent: true, messages: [...conv.messages, msg] });
       setText("");
     } catch (err) {
       notify((err as Error).message, "bad");
@@ -95,11 +98,20 @@ export default function Chat() {
         <div ref={bottom} />
       </div>
 
-      <form className="composer" onSubmit={send}>
+      {conv.intro_sent && conv.consent !== "accepted" && <div className="card">
+        <p>{conv.consent === "declined" ? "Знакомство отложено." : conv.can_decide ? "Принять запрос на знакомство?" : "Запрос отправлен. Переписка откроется после согласия собеседника."}</p>
+        {conv.can_decide && ["accepted", "declined"].filter(value => value !== conv.consent).map(value =>
+          <button key={value} className="btn btn-ghost" disabled={sending} onClick={async () => {
+            setSending(true);
+            try { await api.patch(`/chats/${id}/`, { consent: value }); await load(); }
+            catch (e) { notify((e as Error).message, "bad"); } finally { setSending(false); }
+          }}>{value === "accepted" ? "Принять знакомство" : "Отложить"}</button>)}
+      </div>}
+      {(!conv.intro_sent || conv.consent === "accepted") && <form className="composer" onSubmit={send}>
         <textarea
           className="input"
           rows={2}
-          placeholder="Сообщение…"
+          placeholder={conv.consent === "pending" ? "Почему хотите познакомиться?" : "Сообщение…"}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -110,9 +122,9 @@ export default function Chat() {
           }}
         />
         <button className="btn" disabled={sending || !text.trim()}>
-          Отправить
+          {conv.consent === "pending" ? "Отправить запрос" : "Отправить"}
         </button>
-      </form>
+      </form>}
     </div>
   );
 }

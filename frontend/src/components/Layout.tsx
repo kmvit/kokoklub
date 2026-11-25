@@ -88,14 +88,14 @@ export default function Layout() {
       <header className="header">
         <div className="header-inner">
           <Link to={staffArea ? "/staff" : "/"} className="logo">
-            <img src="/brand/koko_B_horizontal_on-dark.svg" alt="Клуб Коко" width="120" height="48" />
+            <img src={`${import.meta.env.BASE_URL}brand/koko_B_horizontal_on-dark.svg`} alt="Клуб Коко" width="120" height="48" />
           </Link>
           <nav className={`nav ${mobileMenuOpen ? "nav-open" : ""}`} id="site-navigation" aria-label="Основная навигация" onClick={() => setMobileMenuOpen(false)}>
             {staffArea ? <><span className="workspace-label">Рабочий кабинет</span></> : <>
               {me && <NavLink to="/" end>Главная</NavLink>}
               <NavLink to="/afisha">Афиша</NavLink>
               {!me && <NavLink to="/login?mode=register">Стать участником</NavLink>}
-              {me && <><NavLink to="/people">Люди</NavLink><NavLink to="/projects">Проекты</NavLink><NavLink to="/messages">Сообщения{me.unread > 0 && <span className="count">{me.unread}</span>}</NavLink>{menuUrl && <a href={menuUrl}>Меню бара</a>}</>}
+              {me && <><NavLink to="/people">Люди</NavLink><NavLink to="/projects">Проекты</NavLink><NavLink to="/club">Онлайн-клуб</NavLink><NavLink to="/messages">Сообщения{me.unread > 0 && <span className="count">{me.unread}</span>}</NavLink>{menuUrl && <a href={menuUrl}>Меню бара</a>}</>}
             </>}
           </nav>
           <div className="header-right">
@@ -134,7 +134,7 @@ export default function Layout() {
           ["/me", "Кабинет", "M20 21v-3a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v3 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8"],
         ] as const).map(([to, label, path]) => <NavLink key={to} to={to} end={to === "/"}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg><span>{label}</span>{to === "/messages" && me.unread > 0 && <span className="dock-badge" aria-label={`${me.unread} непрочитанных`}>{me.unread > 99 ? "99+" : me.unread}</span>}</NavLink>)}
       </nav>}
-      <footer className="club-footer"><Link to={staffArea ? "/staff" : "/"} className="footer-logo"><img src="/brand/koko_B_horizontal_on-dark.svg" alt="Клуб Коко" width="120" height="48" /></Link><p>Хорошо, когда есть свои.</p><span>Люди. Идеи. Встречи.</span></footer>
+      <footer className="club-footer"><Link to={staffArea ? "/staff" : "/"} className="footer-logo"><img src={`${import.meta.env.BASE_URL}brand/koko_B_horizontal_on-dark.svg`} alt="Клуб Коко" width="120" height="48" /></Link><p>Хорошо, когда есть свои.</p><span>Люди. Идеи. Встречи.</span></footer>
     </div>
   );
 }
