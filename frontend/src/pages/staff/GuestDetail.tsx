@@ -79,7 +79,7 @@ function GuestDetails({ id }: { id?: string }) {
             <Link className="btn" to={`/staff/bind?member=${member.id}`}>{member.card ? "Перевыпустить карту" : "Привязать карту"}</Link>
             <StaffEventDesk memberId={member.id} onEntry={() => { setMember(current => current && { ...current, in_club: true }); setArrivalRevision(n => n + 1); }} />
             <StaffGuestArrivals memberId={member.id} />
-            <StaffMembership key={arrivalRevision} onBalance={updateBalance} memberId={member.id} onEntry={() => setMember(current => current && { ...current, in_club: true })} />
+            <StaffMembership key={arrivalRevision} onBalance={updateBalance} memberId={member.id} />
             {me && <StaffTopUp key={me.id} member={member} cashierId={me.id}
               onBalance={updateBalance} />}
             <div className="staff-guest-manage">

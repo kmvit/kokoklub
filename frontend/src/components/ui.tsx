@@ -54,7 +54,7 @@ export function Modal({
   }, [onClose]);
   return (
     <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel">
+      <div className="modal-panel box">
         <div className="modal-head">
           <h3>{title}</h3>
           <button className="icon-btn" onClick={onClose} aria-label="Закрыть">

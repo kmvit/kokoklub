@@ -5,7 +5,9 @@
 #club-workspace :is(.staff-tabs,.profile-section,.account-history-panel){padding-block:var(--s4)}
 #club-workspace :is(input:not([type=checkbox]):not([type=file]),textarea,select){max-width:100%;padding:.65em;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px}
 #club-workspace label{display:grid;gap:.35em}
-#club-workspace :is(.modal-panel,.modal-card){background:#f4ead9;color:#30271e;max-height:85vh;overflow:auto;padding:var(--s5);width:min(92vw,520px)}
+#club-workspace .modal-panel{color:var(--text);max-height:85dvh;overflow:auto}
+#club-workspace .modal-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s4)}
+#club-workspace .modal-head .icon-btn{flex:none;width:44px;height:44px;background:transparent;color:var(--text);border:1px solid var(--line-2);font-size:24px;cursor:pointer}
 #club-workspace .staff-tab-mobile{display:none}
 #club-workspace .account-history li{display:flex;gap:1em;flex-wrap:wrap}
 #club-workspace .avatar,.guest-photo img{object-fit:cover;border-radius:50%}
