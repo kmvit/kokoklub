@@ -58,8 +58,21 @@ export function mountWorkspace(
   onMeChange: (me: Me | null) => void, onBalance: (balance: number) => void,
 ) {
   const root = createRoot(el);
-  root.render(<Router location={"/" + path} navigator={navigation}>
-    <AuthProvider initialMe={me} onMeChange={onMeChange}><ToastProvider><Screens onBalance={onBalance} /></ToastProvider></AuthProvider>
-  </Router>);
-  return () => { root.unmount(); if (path === "staff/entrance") stopEntranceNfc(); };
+  let currentPath = "";
+  const navigate = (nextPath: string) => {
+    if (currentPath === nextPath) return;
+    if (currentPath.split("?")[0] === "staff/entrance") stopEntranceNfc();
+    currentPath = nextPath;
+    root.render(<Router location={"/" + currentPath} navigator={navigation}>
+      <AuthProvider initialMe={me} onMeChange={onMeChange}><ToastProvider><Screens onBalance={onBalance} /></ToastProvider></AuthProvider>
+    </Router>);
+  };
+  navigate(path);
+  return {
+    navigate,
+    unmount() {
+      root.unmount();
+      if (currentPath.split("?")[0] === "staff/entrance") stopEntranceNfc();
+    },
+  };
 }

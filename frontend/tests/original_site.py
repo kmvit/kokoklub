@@ -112,7 +112,17 @@ with sync_playwright() as pw:
     staffpage.on("pageerror", lambda e: errors.append(str(e)))
     login(staffpage,"staff@example.org")
     expect(staffpage.get_by_text("Кабинет кассира")).to_be_visible()
+    staffpage.evaluate("""() => {
+        window.initialCashierHeader = document.querySelector('header.cashier-head');
+        window.initialCashierMenu = document.querySelector('nav.cashier-nav');
+    }""")
+    staffpage.get_by_role("link", name="Выдать карту", exact=True).click()
+    expect(staffpage.get_by_role("heading", name="Привязать карту гостю")).to_be_visible()
     staffpage.get_by_role("link", name="Найти гостя", exact=True).click()
+    expect(staffpage.get_by_role("searchbox")).to_be_visible()
+    assert staffpage.evaluate("""() =>
+        window.initialCashierHeader === document.querySelector('header.cashier-head') &&
+        window.initialCashierMenu === document.querySelector('nav.cashier-nav')""")
     staffpage.get_by_role("searchbox").fill(walkin_guest.phone[-4:])
     staffpage.get_by_role("link", name="Гость без карты", exact=False).click()
     expect(staffpage.get_by_role("heading", name="Гость без карты")).to_be_visible()

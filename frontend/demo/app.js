@@ -345,12 +345,17 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
     <div id="club-assistant"></div>`;
   }
 
+  function unmountWorkspace() {
+    S.workspace?.unmount();
+    S.workspace = null;
+    S.staffWorkspace = false;
+  }
+
   let shellRole;
   function renderShell() {
     const app = $('#app'), role = S.me?.is_staff ? 'staff' : S.me?.resident ? 'resident' : S.me ? 'guest' : 'public';
     if (shellRole !== role) {
-      S.unmount?.();
-      S.unmount = null;
+      unmountWorkspace();
       app.innerHTML = shell();
       shellRole = role;
     }
@@ -421,15 +426,21 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       if (ready) await ready;
       if (id !== drawing) return;
       renderShell();
+      const staff = S.me?.is_staff;
+      const staffWorkspace = staff && (!path || base === 'staff');
+      if (S.staffWorkspace && staffWorkspace && displayedRoute !== routeKey) {
+        displayedRoute = routeKey;
+        if ($('.more')) $('.more').open = false;
+        S.workspace.navigate(workspacePath);
+        return;
+      }
       if (displayedRoute !== routeKey) {
-        S.unmount?.();
-        S.unmount = null;
+        unmountWorkspace();
         displayedRoute = routeKey;
         $('#section-content').innerHTML = band(loadingHTML('раздела'));
         document.body.classList.remove('noscroll');
         if ($('.more')) $('.more').open = false;
       }
-      const staff = S.me?.is_staff;
       if (!path && !S.me) {
         await Promise.all([loadEvents(), loadTariffs()]);
         html = await home();
@@ -491,8 +502,7 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
     }
     if (id !== drawing) return;
     renderShell();
-    S.unmount?.();
-    S.unmount = null;
+    unmountWorkspace();
     const main = $('#section-content');
     main.innerHTML = html;
     renderAssistant();
@@ -505,7 +515,8 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       try {
         const { mountWorkspace } = await import('../src/workspace');
         if (id !== drawing) return;
-        S.unmount = mountWorkspace(workspace, workspacePath, sessionUser, updateUser, updateBalance);
+        S.workspace = mountWorkspace(workspace, workspacePath, sessionUser, updateUser, updateBalance);
+        S.staffWorkspace = S.me?.is_staff && (!path || base === 'staff');
       } catch (err) {
         if (id === drawing) workspace.innerHTML = sectionError(err);
       }
