@@ -72,6 +72,12 @@ class VisitPackTests(TestCase):
         self.api.force_authenticate(self.staff)
         booking = guest.resident_bookings.get()
         with patch("club.event_desk.timezone.now", return_value=today):
+            url = f"/api/staff/members/{guest.pk}/event-desk/"
+            for action in ("day", "day_pack"):
+                response = self.api.post(url, {"action": action, "amount": 1000, "day": today.date()}, format="json")
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(account_balance(guest), 1050)
+            self.assertFalse(guest.walkins.exists())
             self.assertEqual(self.api.post(f"/api/staff/members/{guest.pk}/event-desk/", {"action": "resident", "id": booking.pk}, format="json").status_code, 200)
         self.assertEqual(EntryPayment.objects.get().amount, 750)
 

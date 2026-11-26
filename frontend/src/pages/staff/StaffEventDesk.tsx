@@ -34,7 +34,7 @@ export default function StaffEventDesk({ memberId, onEntry }: { memberId: number
     setBusy(true);
     try {
       const updated = await api.post<Desk>(path, { ...operation,
-        ...(operation.action.startsWith("day") ? { day: desk?.walkin?.day, amount: desk?.walkin?.price } : {}),
+        ...(operation.action.startsWith("day") ? { day: desk?.walkin?.day, amount: desk?.walkin?.paid ? undefined : desk?.walkin?.price } : {}),
         ...(operation.action === "food" ? { amount: Number(amount) } : {}) });
       setDesk(updated);
       if (["resident", "organizer", "visit", "day", "day_pack"].includes(operation.action)) onEntry(updated.balance);
@@ -44,10 +44,13 @@ export default function StaffEventDesk({ memberId, onEntry }: { memberId: number
     finally { setBusy(false); }
   }
   if (!error && (!desk || !(desk.walkin || desk.places.length || desk.hosting.length || desk.rewards.length))) return null;
+  const bookingToday = desk?.places.some(p => !p.visit_id &&
+    new Date(p.event__starts_at).toLocaleDateString("sv-SE", { timeZone: "Europe/Moscow" }) === desk.day);
   return <section className="staff-guest-manage"><h2>Вход и брони</h2>
     {error && !operation && <p role="alert">{error}</p>}
     {desk?.walkin && <div className="cashier-admit">
-      {desk.walkin.paid ? <>{desk.walkin.in_club ? <p>Вход на сегодня учтён</p> : button(memberId, "day", "Отметить повторный вход", "Без доплаты в тот же день")}</> :
+      {desk.walkin.paid ? <><p>Вход на сегодня учтён</p><strong>К списанию: 0 токенов</strong>{!desk.walkin.in_club && button(memberId, "day", "Отметить повторный вход", "Без доплаты в тот же день")}</> : bookingToday ?
+        <p>Вход по брони · к списанию 0 токенов. Отметьте приход по записи ниже.</p> :
         <>{button(memberId, "day", `Вход со счёта · ${desk.walkin.price} токенов`, "Дневной вход")}
           {desk.walkin.visits > 0 && button(memberId, "day_pack", "Списать 1 пакетный визит", "Дневной вход")}</>}
     </div>}

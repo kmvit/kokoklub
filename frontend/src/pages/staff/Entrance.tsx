@@ -77,6 +77,7 @@ export default function Entrance() {
             : error || (lookingUp ? "Открываем карточку гостя." : scanning ? "Поднесите карту гостя к задней панели телефона."
             : phoneReader ? "Включите NFC кнопкой ниже или приложите карту к внешнему ридеру."
             : "Приложите карту к внешнему ридеру. Если ридера нет, найдите гостя по имени или телефону.")}</p>
+          {visit?.kind === "enter" && <strong>Вход на сегодня учтён · к списанию 0 токенов</strong>}
         </div>
         <div className="gate-actions">
           {phoneReader && !visit && <button className="btn" disabled={lookingUp} onClick={toggleScan}>

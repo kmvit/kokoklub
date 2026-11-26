@@ -160,6 +160,8 @@ with sync_playwright() as pw:
         staffpage.keyboard.type("53AB1234567890")
         staffpage.keyboard.press("Enter")
         expect(staffpage.get_by_role("heading", name=result)).to_be_visible()
+        if result == "Вход отмечен":
+            expect(staffpage.get_by_text("Вход на сегодня учтён · к списанию 0 токенов")).to_be_visible()
     staffpage.get_by_role("link", name="Найти гостя", exact=True).click()
     expect(staffpage.get_by_role("searchbox")).to_be_visible()
     staffpage.evaluate("""() => { window.NDEFReader = class {
@@ -171,6 +173,8 @@ with sync_playwright() as pw:
     staffpage.get_by_role("button", name="Считать карту телефоном").click()
     staffpage.evaluate("window.testReader.onreading({serialNumber: '53AB1234567890'})")
     expect(staffpage.get_by_role("heading", name="Гость без карты")).to_be_visible()
+    expect(staffpage.get_by_text("К списанию: 0 токенов", exact=True)).to_be_visible()
+    expect(staffpage.get_by_role("button", name="Вход со счёта", exact=False)).to_have_count(0)
     staffpage.goto(base + f"/#staff/guests/{user.pk}")
     expect(staffpage.get_by_text("Место резидента оплачено",exact=False)).to_be_visible()
     expect(staffpage.get_by_role("heading",name="Гостевые места резидента")).to_be_visible()

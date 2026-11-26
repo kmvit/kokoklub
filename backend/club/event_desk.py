@@ -32,10 +32,14 @@ def day_price(member, sale):
     return GUEST_ENTRY
 
 
+def active_bookings(member):
+    return member.resident_bookings.filter(cancelled_at__isnull=True, event__is_published=True,
+                                           event__cancelled_at__isnull=True)
+
+
 def desk(member):
     today = timezone.localdate()
-    bookings = member.resident_bookings.filter(cancelled_at__isnull=True, event__starts_at__date__gte=today,
-                                              event__is_published=True, event__cancelled_at__isnull=True)
+    bookings = active_bookings(member).filter(event__starts_at__date__gte=today)
     events = Event.objects.filter(organizer=member, is_published=True, cancelled_at__isnull=True, starts_at__date=today)
     sale = active_sale(member)
     return {
@@ -83,6 +87,8 @@ class MemberEventDesk(APIView):
             if args.get("day") != today:
                 return Response({"detail": "Сменился день визита. Обновите карточку участника."}, status=409)
             if not admitted_today(member, today):
+                if active_bookings(member).filter(event__starts_at__date=today, visit__isnull=True).exists():
+                    return Response({"detail": "На сегодня есть бронь. Отметьте приход по записи без доплаты."}, status=409)
                 price = day_price(member, sale)
                 use_pack = action == "day_pack"
                 if use_pack and (not sale or sale.visits_left <= 0):
