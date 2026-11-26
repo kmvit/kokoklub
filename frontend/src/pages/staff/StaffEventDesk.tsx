@@ -4,15 +4,16 @@ import { Modal } from "../../components/ui";
 
 type Reward = { id: number; title: string; meal: number; completed: boolean; can_complete: boolean; visit_used: boolean; invite_used: boolean };
 type Desk = {
+  balance: string;
   day: string;
   walkin: { day: string; price: number; visits: number; paid: boolean; in_club: boolean } | null;
   places: { guest: boolean; id: number; event__starts_at: string; event__title: string; visit_id: number | null }[];
   hosting: { id: number; title: string }[];
   rewards: Reward[];
 };
-type Operation = { id: number; action: string; label: string; title: string; reference: string };
+type Operation = { id: number; action: string; label: string; title: string; reference?: string };
 
-export default function StaffEventDesk({ memberId, onEntry }: { memberId: number; onEntry: () => void }) {
+export default function StaffEventDesk({ memberId, onEntry }: { memberId: number; onEntry: (balance: string) => void }) {
   const path = `/staff/members/${memberId}/event-desk/`;
   const [desk, setDesk] = useState<Desk | null>(null);
   const [operation, setOperation] = useState<Operation | null>(null);
@@ -25,17 +26,18 @@ export default function StaffEventDesk({ memberId, onEntry }: { memberId: number
 
   function button(id: number, action: string, label: string, title: string) {
     return <button className="btn btn-ghost" onClick={() => {
-      setError(""); setAmount(""); setOperation({ id, action, label, title, reference: crypto.randomUUID() });
+      setError(""); setAmount(""); setOperation({ id, action, label, title, reference: action === "food" ? crypto.randomUUID() : undefined });
     }}>{label}</button>;
   }
   async function submit() {
     if (!operation || busy) return;
     setBusy(true);
     try {
-      setDesk(await api.post<Desk>(path, { ...operation,
+      const updated = await api.post<Desk>(path, { ...operation,
         ...(operation.action.startsWith("day") ? { day: desk?.walkin?.day, amount: desk?.walkin?.price } : {}),
-        ...(operation.action === "food" ? { amount: Number(amount) } : {}) }));
-      if (["resident", "organizer", "visit", "day", "day_pack"].includes(operation.action)) onEntry();
+        ...(operation.action === "food" ? { amount: Number(amount) } : {}) });
+      setDesk(updated);
+      if (["resident", "organizer", "visit", "day", "day_pack"].includes(operation.action)) onEntry(updated.balance);
       setOperation(null);
       setError("");
     } catch (e) { setError((e as Error).message); }
@@ -61,7 +63,7 @@ export default function StaffEventDesk({ memberId, onEntry }: { memberId: number
     {operation && <Modal title={operation.label} onClose={() => { if (!busy) setOperation(null); }}><p>{operation.title}</p>
       {operation.action === "food" && <label>Стоимость еды в кредитах <input className="input" type="number" min="1" max="1000" value={amount} onChange={e => setAmount(e.target.value)} /></label>}
       {error && <p role="alert">{error}</p>}
-      <button className="btn" disabled={busy || (operation.action === "food" && Number(amount) <= 0)} onClick={submit}>Подтвердить</button>
+      <button className="btn" disabled={busy || (operation.action === "food" && Number(amount) <= 0)} onClick={submit}>{busy ? "Сохраняем…" : operation.action === "day" && !desk?.walkin?.paid ? "Подтвердить списание" : "Подтвердить"}</button>
     </Modal>}
   </section>;
 }

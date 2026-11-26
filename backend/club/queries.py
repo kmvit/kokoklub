@@ -21,6 +21,10 @@ def open_visits():
     return Visit.objects.filter(left_at__isnull=True, entered_at__gte=club_day_start())
 
 
+def visit_for(member):
+    return open_visits().filter(member=member).first() or Visit.objects.create(member=member)
+
+
 def with_club_flags(qs):
     return qs.annotate(
         has_card=Exists(Card.objects.filter(member=OuterRef("pk"), is_active=True)),

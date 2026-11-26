@@ -179,7 +179,7 @@ class ScanView(APIView):
                 action = "exit"
             else:
                 from .event_desk import admitted_today
-                if member.membership_sales.exists() and not admitted_today(member, timezone.localdate()):
+                if not admitted_today(member, timezone.localdate()):
                     return Response({"action": "desk", "member_id": member.pk})
                 visit = Visit.objects.create(member=member, card=card)
                 action = "enter"

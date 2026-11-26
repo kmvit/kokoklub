@@ -9,12 +9,9 @@ from rest_framework.views import APIView
 
 from members.models import Event, ResidentBooking, User, account_balance
 from members.bookings import active_sale
+from .membership import GUEST_ENTRY
 from .models import EntryPayment, FoodRedemption, OrganizerReward, Visit, WalkIn
-from .queries import open_visits
-
-
-def visit_for(member):
-    return open_visits().filter(member=member).first() or Visit.objects.create(member=member)
+from .queries import open_visits, visit_for
 
 
 def meal_balance(reward):
@@ -22,9 +19,17 @@ def meal_balance(reward):
 
 
 def admitted_today(member, day):
-    return member.visits.filter(entered_at__date=day).filter(
-        Q(walkin__isnull=False) | Q(residentbooking__isnull=False) | Q(entrypayment__isnull=False)
+    if member.membership_sales.filter(cashier__isnull=False, starts_at__date=day).exists():
+        return True
+    return member.walkins.filter(day=day).exists() or member.visits.filter(entered_at__date=day).filter(
+        Q(residentbooking__isnull=False) | Q(entrypayment__isnull=False)
     ).exists() or member.organizer_rewards.filter(Q(arrival__entered_at__date=day) | Q(extra_visit__entered_at__date=day)).exists()
+
+
+def day_price(member, sale):
+    if sale or member.is_member:
+        return 500 if timezone.localtime().hour < 13 else 750
+    return GUEST_ENTRY
 
 
 def desk(member):
@@ -33,12 +38,10 @@ def desk(member):
                                               event__is_published=True, event__cancelled_at__isnull=True)
     events = Event.objects.filter(organizer=member, is_published=True, cancelled_at__isnull=True, starts_at__date=today)
     sale = active_sale(member)
-    walkin = None
-    if sale:
-        walkin = {"day": today, "price": 500 if timezone.localtime().hour < 13 else 750, "visits": sale.visits_left,
-                  "paid": admitted_today(member, today), "in_club": open_visits().filter(member=member).exists()}
     return {
-        "walkin": walkin,
+        "balance": format(account_balance(member), ".2f"),
+        "walkin": {"day": today, "price": day_price(member, sale), "visits": sale.visits_left if sale else 0,
+                   "paid": admitted_today(member, today), "in_club": open_visits().filter(member=member).exists()},
         "day": today,
         "places": list(bookings.order_by("event__starts_at").values("id", "event__title", "event__starts_at", "visit_id", "guest")),
         "hosting": list(events.filter(organizerreward__isnull=True).values("id", "title")),
@@ -77,19 +80,26 @@ class MemberEventDesk(APIView):
         today = timezone.localdate()
         if action in ("day", "day_pack"):
             sale = active_sale(member)
-            if not sale:
-                return Response({"detail": "Нет действующего тарифа."}, status=409)
             if args.get("day") != today:
                 return Response({"detail": "Сменился день визита. Обновите карточку участника."}, status=409)
             if not admitted_today(member, today):
-                price = 500 if timezone.localtime().hour < 13 else 750
+                price = day_price(member, sale)
                 use_pack = action == "day_pack"
-                if use_pack and not sale.visits_left:
+                if use_pack and (not sale or sale.visits_left <= 0):
                     return Response({"detail": "Пакетные визиты закончились."}, status=409)
-                if not use_pack and (args.get("amount") != price or account_balance(member) < price):
-                    return Response({"detail": "Проверьте цену входа и остаток токенов."}, status=409)
-                WalkIn.objects.create(member=member, cashier=request.user, day=today, visit=visit_for(member),
+                if not use_pack and args.get("amount") != price:
+                    return Response({"detail": "Цена входа изменилась. Обновите карточку гостя."}, status=409)
+                if not use_pack and account_balance(member) < price:
+                    return Response({"detail": "На счёте недостаточно токенов для оплаты входа."}, status=409)
+                visit = visit_for(member)
+                if price == GUEST_ENTRY and timezone.localdate(visit.entered_at) != today:
+                    visit.left_at = timezone.now()
+                    visit.save(update_fields=["left_at"])
+                    visit = Visit.objects.create(member=member)
+                WalkIn.objects.create(member=member, cashier=request.user, day=today, visit=visit,
                                       package_sale=sale if use_pack else None, price=0 if use_pack else price)
+                if price == GUEST_ENTRY:
+                    EntryPayment.objects.create(visit=visit, amount=price, cashier=request.user)
             else:
                 visit_for(member)
         elif action == "resident":

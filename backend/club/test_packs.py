@@ -90,3 +90,24 @@ class VisitPackTests(TestCase):
             self.assertEqual(self.api.post(url, data, format="json").status_code, 200)
             self.assertEqual(self.member.walkins.count(), 1)
             self.assertEqual(account_balance(self.member), 1500)
+
+        with patch("club.event_desk.timezone.now", return_value=day + timedelta(days=1)):
+            self.assertEqual(self.api.post(url, data, format="json").status_code, 409)
+            data["day"] = (day + timedelta(days=1)).date().isoformat()
+            self.assertEqual(self.api.post(url, data, format="json").data["balance"], "1000.00")
+            self.assertEqual(self.member.walkins.count(), 2)
+
+    def test_guest_walkin_debits_once_and_credits_membership(self):
+        self.sale.delete()
+        self.api.force_authenticate(self.staff)
+        url = f"/api/staff/members/{self.member.pk}/event-desk/"
+        walkin = self.api.get(url).data["walkin"]
+        self.assertEqual(walkin["price"], 1000)
+        data = {"action": "day", "amount": 1000, "day": walkin["day"]}
+        for _ in range(2):
+            result = self.api.post(url, data)
+            self.assertEqual(result.data["balance"], "1000.00")
+            self.assertTrue(result.data["walkin"]["paid"])
+        self.assertEqual(self.member.walkins.count(), 1)
+        membership = self.api.get(f"/api/staff/members/{self.member.pk}/membership/")
+        self.assertEqual(membership.data["due"], 500)

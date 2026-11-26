@@ -4,10 +4,10 @@ import { api } from "../../api";
 import { Modal } from "../../components/ui";
 
 type Tariff = { name: string; price: number; due: number; days: number };
-type Status = { balance: string; expires: string | null; tariffs: Record<string, Tariff>; active_tariff: string | null; invites_left: number; entry_id: number | null; legacy: boolean };
+type Status = { in_club: boolean; balance: string; expires: string | null; tariffs: Record<string, Tariff>; active_tariff: string | null; invites_left: number; entry_id: number | null; legacy: boolean };
 
 
-export default function StaffMembership({ memberId, hasCard, onBalance }: { memberId: number; hasCard: boolean; onBalance: (balance: string) => void }) {
+export default function StaffMembership({ memberId, hasCard, onSale }: { memberId: number; hasCard: boolean; onSale: (balance: string, inClub: boolean) => void }) {
   const url = `/staff/members/${memberId}/membership/`;
   const [status, setStatus] = useState<Status | null>(null);
   const [action, setAction] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export default function StaffMembership({ memberId, hasCard, onBalance }: { memb
     try {
       const next = await api.post<Status>(url, { action, paid: tariff.due, entry_id: status.entry_id });
       setStatus(next);
-      onBalance(next.balance);
+      onSale(next.balance, next.in_club);
       setAction(null);
     } catch (e) {
       setError((e as Error).message);
@@ -51,6 +51,7 @@ export default function StaffMembership({ memberId, hasCard, onBalance }: { memb
     </>}
     {tariff && <Modal title="Подтвердить оплату на кассе?" onClose={() => { if (!busy) setAction(null); }}>
       <p>Карта «{tariff.name}» на {tariff.days} дн. · {tariff.due.toLocaleString("ru-RU")} ₽</p>
+      <p>Сегодняшний вход входит в стоимость карты. После оплаты гость появится в списке «Сейчас в клубе».</p>
       <button className="btn primary" disabled={busy} onClick={confirm}>Оплата получена</button>
     </Modal>}
   </section>;

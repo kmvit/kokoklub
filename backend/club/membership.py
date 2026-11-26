@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from members.models import User, account_balance
 from .models import EntryPayment, MembershipSale, Visit
-from .queries import open_visits
+from .queries import open_visits, visit_for
 
 TARIFFS = {
     MembershipSale.Tariff.MONTH: (1500, 30),
@@ -35,6 +35,7 @@ def status(member):
     }
     return {
         "tariffs": tariffs,
+        "in_club": open_visits().filter(member=member).exists(),
         "balance": str(account_balance(member)),
         "invites_left": sale.invites_left if sale else 0,
         "active_tariff": sale.get_tariff_display() if sale else None,
@@ -83,6 +84,7 @@ class StaffMembershipView(APIView):
                 member=member, tariff=action, cashier=request.user, entry_payment_id=state["entry_id"],
                 paid=quote["due"], starts_at=start, ends_at=start + timedelta(days=quote["days"]),
             )
+            visit_for(member)
         else:
             return Response({"detail": "Неизвестная операция"}, status=400)
         return Response(status(member))

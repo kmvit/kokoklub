@@ -20,6 +20,7 @@ function GuestDetails({ id }: { id?: string }) {
   const [member, setMember] = useState<StaffMember | null>(null);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [membershipRevision, setMembershipRevision] = useState(0);
   const [arrivalRevision, setArrivalRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
@@ -76,9 +77,9 @@ function GuestDetails({ id }: { id?: string }) {
             </div>
             {member.card && <p className="muted small">UID карты: {member.card.uid}</p>}
             {member.is_hidden && <p className="muted small">Скрыт из каталога участников</p>}
-            <StaffEventDesk memberId={member.id} onEntry={() => { setMember(current => current && { ...current, in_club: true }); setArrivalRevision(n => n + 1); }} />
+            <StaffEventDesk key={membershipRevision} memberId={member.id} onEntry={(balance) => { setMember(current => current && { ...current, balance, in_club: true }); setArrivalRevision(n => n + 1); }} />
             <StaffGuestArrivals memberId={member.id} />
-            <StaffMembership hasCard={!!member.card} key={arrivalRevision} onBalance={updateBalance} memberId={member.id} />
+            <StaffMembership hasCard={!!member.card} key={arrivalRevision} onSale={(balance, inClub) => { setMember(current => current && { ...current, balance, in_club: inClub }); setMembershipRevision(n => n + 1); }} memberId={member.id} />
             {me && <StaffTopUp key={me.id} member={member} cashierId={me.id}
               onBalance={updateBalance} />}
             <div className="staff-guest-manage">

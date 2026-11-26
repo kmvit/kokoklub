@@ -4,7 +4,9 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from members.models import User
+from uuid import uuid4
+
+from members.models import TopUp, User, account_balance
 
 from .models import Card, MembershipSale, Visit, normalize_uid
 
@@ -64,11 +66,24 @@ class StaffTests(TestCase):
     def test_scan_toggles_enter_exit(self):
         Card.objects.create(member=self.guest, uid="53FB5119230001")
         res = self.api.post("/api/staff/scan/", {"uid": "53fb5119230001"}, format="json")
-        self.assertEqual(res.data["action"], "enter")
+        self.assertEqual(res.data["action"], "desk")
+        self.assertFalse(self.guest.visits.exists())
+        url = f"/api/staff/members/{self.guest.pk}/event-desk/"
+        quote = self.api.get(url).data["walkin"]
+        data = {"action": "day", "day": quote["day"], "amount": quote["price"]}
+        self.assertEqual(self.api.post(url, data).status_code, 409)
+        self.assertFalse(self.guest.visits.exists())
+        TopUp.objects.create(member=self.guest, created_by=self.staff, amount=1000, reference=uuid4())
+        self.assertEqual(self.api.post(url, data).status_code, 200)
         self.assertEqual(len(self.api.get("/api/staff/inside/").data), 1)
         res = self.api.post("/api/staff/scan/", {"uid": "53fb5119230001"}, format="json")
         self.assertEqual(res.data["action"], "exit")
         self.assertEqual(self.api.get("/api/staff/inside/").data, [])
+
+        res = self.api.post("/api/staff/scan/", {"uid": "53fb5119230001"})
+        self.assertEqual(res.data["action"], "enter")
+        self.assertEqual(account_balance(self.guest), 1000 - quote["price"])
+        self.assertEqual(self.guest.walkins.count(), 1)
 
     def test_unknown_card(self):
         res = self.api.post("/api/staff/scan/", {"uid": "53FB5119230009"}, format="json")
@@ -100,7 +115,7 @@ class StaffTests(TestCase):
         Visit.objects.create(member=self.guest, card=card, entered_at=timezone.now() - timedelta(days=2))
         self.assertEqual(self.api.get("/api/staff/inside/").data, [])
         res = self.api.post("/api/staff/scan/", {"uid": "53FB5119230001"}, format="json")
-        self.assertEqual(res.data["action"], "enter")
+        self.assertEqual(res.data["action"], "desk")
 
     def test_create_guest_requires_consent(self):
         res = self.api.post("/api/staff/members/", {"phone": "89005556677", "full_name": "Пётр"}, format="json")
@@ -129,6 +144,30 @@ class MembershipSaleTests(TestCase):
         api.post(url, purchase, format="json")
         self.assertEqual(guest.membership_sales.count(), 1)
         self.assertTrue(guest.is_member)
+
+        self.assertEqual(guest.visits.count(), 1)
+        self.assertEqual(guest.membership_sales.get().paid, 500)
+
+    def test_cashier_sale_includes_entry_without_a_debit(self):
+        staff = User.objects.create_user("79009992222", is_staff=True)
+        guest = User.objects.create_user("79009993333")
+        api = APIClient()
+        api.force_authenticate(staff)
+        path = f"/api/staff/members/{guest.pk}/"
+        purchase = {"action": "month", "paid": 1500, "entry_id": None}
+        for _ in range(2):
+            result = api.post(path + "membership/", purchase, format="json")
+            self.assertTrue(result.data["in_club"])
+        self.assertEqual(guest.visits.count(), 1)
+        self.assertTrue(api.get(path + "event-desk/").data["walkin"]["paid"])
+        self.assertEqual(api.get("/api/staff/inside/").data[0]["member"]["id"], guest.pk)
+        visit = guest.visits.get()
+        api.post(f"/api/staff/visits/{visit.pk}/leave/")
+        self.assertFalse(api.post(path + "membership/", purchase, format="json").data["in_club"])
+        self.assertEqual(api.post(path + "event-desk/", {"action": "day", "day": timezone.localdate()}).status_code, 200)
+        self.assertEqual(account_balance(guest), 0)
+        self.assertFalse(guest.walkins.exists())
+        self.assertEqual(guest.visits.count(), 2)
 
     def test_prior_day_payment_and_expired_quote(self):
         staff = User.objects.create_user("79009992222", is_staff=True)
