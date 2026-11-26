@@ -65,30 +65,31 @@ function GuestDetails({ id }: { id?: string }) {
       {error && <div className="error">{error}</div>}
       {!member && !error && <p className="muted">Загрузка…</p>}
       {member && (
-        <div className="card staff-guest-detail">
+        <div className="cashier-detail">
+          <header className="cashier-identity">
           <StaffPhoto name={member.full_name || "Гость"} photo={member.photo} />
-          <div className="staff-guest-info">
-            <h1>{member.full_name || "Без имени"}</h1>
+          <div>
+            <h2>{member.full_name || "Без имени"}</h2>
             <a className="staff-phone" href={`tel:+${member.phone}`}>{formatPhone(member.phone)}</a>
             {(member.activity || member.occupation) && <p className="muted">{[member.activity, member.occupation].filter(Boolean).join(" · ")}</p>}
             <div className="staff-guest-status">
               {member.in_club ? <span className="pill ok">Сейчас в клубе</span> : <span className="pill">Не в клубе</span>}
               {member.card ? <span className="pill ok">NFC-карта привязана</span> : <span className="pill warn">NFC-карта не привязана</span>}
             </div>
-            {member.card && <p className="muted small">UID карты: {member.card.uid}</p>}
-            {member.is_hidden && <p className="muted small">Скрыт из каталога участников</p>}
+          </div></header>
             <StaffEventDesk key={membershipRevision} memberId={member.id} onEntry={(balance) => { setMember(current => current && { ...current, balance, in_club: true }); setArrivalRevision(n => n + 1); }} />
-            <StaffGuestArrivals memberId={member.id} />
-            <StaffMembership hasCard={!!member.card} key={arrivalRevision} onSale={(balance, inClub) => { setMember(current => current && { ...current, balance, in_club: inClub }); setMembershipRevision(n => n + 1); }} memberId={member.id} />
             {me && <StaffTopUp key={me.id} member={member} cashierId={me.id}
               onBalance={updateBalance} />}
-            <div className="staff-guest-manage">
-              <h2>Управление гостем</h2>
+            <StaffGuestArrivals memberId={member.id} />
+            <StaffMembership hasCard={!!member.card} key={arrivalRevision} onSale={(balance, inClub) => { setMember(current => current && { ...current, balance, in_club: inClub }); setMembershipRevision(n => n + 1); }} memberId={member.id} />
+            <details className="cashier-fold"><summary>Управление гостем</summary><div>
+            {member.card && <p className="muted small">UID карты: {member.card.uid}</p>}
+            {member.is_hidden && <p className="muted small">Скрыт из каталога участников</p>}
+
               <button className="btn btn-ghost" onClick={toggleHidden} disabled={busy}>{member.is_hidden ? "Показать в каталоге" : "Скрыть из каталога"}</button>
               {member.card && <button className="btn btn-ghost" onClick={() => setConfirmRevoke(true)} disabled={busy}>Отвязать карту</button>}
               {actionError && <div className="error" role="alert">{actionError}</div>}
-            </div>
-          </div>
+            </div></details>
         </div>
       )}
       {confirmRevoke && member && (

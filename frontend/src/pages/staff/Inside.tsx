@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { StatusLine, useToast } from "../../components/ui";
 import { formatPhone, formatTime, type InsideVisit } from "../../types";
@@ -9,6 +10,8 @@ import StaffPhoto from "./StaffPhoto";
 // тогда карта, приложенная на баре, тоже отмечает вход и выход.
 export default function Inside() {
   const notify = useToast();
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState<number | null>(null);
   const [visits, setVisits] = useState<InsideVisit[] | null>(null);
 
   const load = useCallback(() => {
@@ -23,7 +26,8 @@ export default function Inside() {
 
   useCardReader(async (uid) => {
     try {
-      const res = await api.post<InsideVisit & { action: "enter" | "exit" }>("/staff/scan/", { uid });
+      const res = await api.post<InsideVisit & { action: "enter" | "exit" } | { action: "desk"; member_id: number }>("/staff/scan/", { uid });
+      if (res.action === "desk") { navigate(`/staff/guests/${res.member_id}`); return; }
       notify(`${res.member.full_name || "Гость"}: ${res.action === "enter" ? "вошёл" : "вышел"}`, "ok");
       load();
     } catch (e) {
@@ -32,8 +36,13 @@ export default function Inside() {
   });
 
   const leave = async (v: InsideVisit) => {
-    await api.post(`/staff/visits/${v.id}/leave/`);
-    load();
+    setLeaving(v.id);
+    try {
+      await api.post(`/staff/visits/${v.id}/leave/`);
+      setVisits(rows => rows?.filter(row => row.id !== v.id) ?? null);
+      notify("Выход отмечен", "ok");
+    } catch (e) { notify((e as Error).message, "bad"); }
+    finally { setLeaving(null); }
   };
 
   return (
@@ -44,27 +53,19 @@ export default function Inside() {
       {visits === null ? (
         <div className="muted">Загрузка…</div>
       ) : visits.length === 0 ? (
-        <div className="empty">Пока никого. Гость приложит карту у входа — и появится здесь.</div>
+        <div className="empty">Пока никого. <Link to="/staff/guests">Найти гостя и оформить вход</Link></div>
       ) : (
-        <div className="grid">
-          {visits.map((v) => (
-            <div key={v.id} className="card inside-card">
-              <StaffPhoto name={v.member.full_name || "Гость"} photo={v.member.photo} />
-              <div className="inside-card-body">
-                <div className="member-card-name">
-                  <strong>{v.member.full_name || formatPhone(v.member.phone)}</strong>
-                  <span className="muted">{v.member.occupation || v.member.activity}</span>
+        <div className="cashier-list">
+          {visits.map(v => (
+            <div key={v.id} className="cashier-visit">
+              <Link className="cashier-person" to={`/staff/guests/${v.member.id}`}>
+                <StaffPhoto name={v.member.full_name || "Гость"} photo={v.member.photo} />
+                <div><strong>{v.member.full_name || formatPhone(v.member.phone)}</strong>
+                  <small>С {formatTime(v.entered_at)} · {formatPhone(v.member.phone)}</small>
+                  <StatusLine status={v.member.status} text={v.member.status_text} />
                 </div>
-                <StatusLine status={v.member.status} text={v.member.status_text} />
-                <div className="inside-foot">
-                  <span className="muted small">
-                    с {formatTime(v.entered_at)} · {formatPhone(v.member.phone)}
-                  </span>
-                  <button className="link" onClick={() => leave(v)}>
-                    Отметить выход
-                  </button>
-                </div>
-              </div>
+              </Link>
+              <button className="cashier-leave" disabled={leaving !== null} aria-label={`Отметить выход: ${v.member.full_name || formatPhone(v.member.phone)}`} onClick={() => leave(v)}>Выход</button>
             </div>
           ))}
         </div>

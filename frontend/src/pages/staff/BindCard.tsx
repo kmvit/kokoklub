@@ -112,13 +112,13 @@ export default function BindCard() {
       {member?.has_active_tariff && !done && (
         <>
           {member.card && <p className="error">У гостя уже есть карта {member.card.uid}. После привязки новой старая перестанет работать.</p>}
-          <p>Возьмите проданную карту и считайте её метку.</p>
-          <button className="btn" onClick={nfc.scanning ? nfc.stop : () => nfc.start((value) => { setUid(value); setError(""); })}>
+          <p>Считайте метку карты ридером или введите её номер вручную.</p>
+          {window.isSecureContext && "NDEFReader" in window && <button className="btn" onClick={nfc.scanning ? nfc.stop : () => nfc.start((value) => { setUid(value); setError(""); })}>
             {nfc.scanning ? "Отменить считывание" : "Считать метку телефоном"}
-          </button>
+          </button>}
           {nfc.scanning && <div className="scan-wait" role="status">Приложите метку к телефону…</div>}
           <form onSubmit={bind} className="bind-confirm">
-            <label className="field"><span>UID метки</span><input className="input" value={uid} onChange={(e) => setUid(e.target.value)} placeholder="Или введите UID вручную / приложите к USB-ридеру" /></label>
+            <label className="field"><span>UID метки</span><input className="input" value={uid} onChange={(e) => setUid(e.target.value)} placeholder="Номер метки" /></label>
             <button className="btn" disabled={!uid.trim() || busy}>{busy ? "Привязываем…" : "Подтвердить привязку"}</button>
           </form>
         </>

@@ -16,6 +16,7 @@ export default function Entrance() {
   const [result, setResult] = useState<Result | null>(null);
   const navigate = useNavigate();
   const nfc = useSyncExternalStore(subscribeEntranceNfc, getEntranceNfc);
+  const phoneReader = window.isSecureContext && "NDEFReader" in window;
   const processed = useRef<string | null>(null);
 
   const toggleScan = () => {
@@ -61,9 +62,10 @@ export default function Entrance() {
         <div className="entrance-box">
           <div className="entrance-logo">коко клуб</div>
           <div className="entrance-title">{nfc.status === "scanning" ? "Приложите карту" : "Считайте карту"}</div>
-          <button className="btn" onClick={toggleScan}>{nfc.status === "scanning" ? "Остановить считывание" : "Считать метку телефоном"}</button>
-          <div className="entrance-sub" role="status">{nfc.status === "scanning" ? "NFC включён — поднесите метку к телефону" : "Нажмите кнопку, затем поднесите метку"}</div>
-          {nfc.error && <div className="error" role="alert">{nfc.error}</div>}
+          {phoneReader && <button className="btn" onClick={toggleScan}>{nfc.status === "scanning" ? "Остановить считывание" : "Считать метку телефоном"}</button>}
+          <div className="entrance-sub" role="status">{nfc.status === "scanning" ? "NFC включён — поднесите метку к телефону" : phoneReader ? "Нажмите кнопку, затем поднесите метку" : "Приложите карту к внешнему ридеру или найдите гостя по телефону."}</div>
+          <Link className="btn" to="/staff/guests" onClick={stopEntranceNfc}>Найти гостя</Link>
+          {phoneReader && nfc.error && <div className="error" role="alert">{nfc.error}</div>}
         </div>
       )}
       {result && result.kind !== "error" && (

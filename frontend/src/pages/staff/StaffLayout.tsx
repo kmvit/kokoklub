@@ -1,21 +1,20 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { beginEntranceNfc } from "../../entranceNfc";
+import "./cashier.css";
 
 export default function StaffLayout() {
   return (
-    <div className="page staff-page">
-      <div className="staff-workspace-heading"><div><p className="eyebrow">Коко клуб</p><h1>Кабинет кассира</h1></div></div>
-      <nav className="staff-tabs" aria-label="Разделы персонала">
-        <NavLink to="/staff" end>
-          <span className="staff-tab-desktop">Кто в клубе</span><span className="staff-tab-mobile">В клубе</span>
-        </NavLink>
-        <NavLink to="/staff/guests"><span className="staff-tab-desktop">Найти гостя</span><span className="staff-tab-mobile">Гости</span></NavLink>
-        <NavLink to="/staff/bind"><span className="staff-tab-desktop">Выдать карту</span><span className="staff-tab-mobile">Выдать карту</span></NavLink>
-        <Link to="/staff/entrance" className="staff-entrance-link" onClick={beginEntranceNfc}>
-          <span className="staff-tab-desktop">Экран у входа ↗</span><span className="staff-tab-mobile">Экран входа</span>
-        </Link>
+    <div className="cashier">
+      <header className="cashier-head">
+        <h1>Кабинет кассира</h1>
+        <Link to="/staff/entrance" onClick={() => { if (window.isSecureContext && "NDEFReader" in window) beginEntranceNfc(); }}>Сканер карт</Link>
+      </header>
+      <nav className="cashier-nav" aria-label="Разделы кассы">
+        <NavLink to="/staff" end>В клубе</NavLink>
+        <NavLink to="/staff/guests">Найти гостя</NavLink>
+        <NavLink to="/staff/bind">Выдать карту</NavLink>
       </nav>
-      <Outlet />
+      <div className="cashier-content"><Outlet /></div>
     </div>
   );
 }

@@ -44,10 +44,12 @@ export default function StaffMembership({ memberId, hasCard, onSale }: { memberI
     {status?.expires && <Link className="btn" to={`/staff/bind?member=${memberId}`}>{hasCard ? "Перевыпустить карту" : "Привязать карту"}</Link>}
     {status && !status.expires && <>
       {status.entry_id && <p>Оплаченный вход учтён в цене карты.</p>}
+      <details className="cashier-fold"><summary>Выбрать тариф</summary><div>
       {Object.entries(status.tariffs).map(([code, option]) =>
         <button key={code} className="btn" onClick={() => setAction(code)}>
           Оформить карту «{option.name}» · {option.due.toLocaleString("ru-RU")} ₽
         </button>)}
+      </div></details>
     </>}
     {tariff && <Modal title="Подтвердить оплату на кассе?" onClose={() => { if (!busy) setAction(null); }}>
       <p>Карта «{tariff.name}» на {tariff.days} дн. · {tariff.due.toLocaleString("ru-RU")} ₽</p>

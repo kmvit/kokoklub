@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { Modal, useToast } from "../../components/ui";
@@ -81,34 +81,34 @@ export default function Guests() {
     } catch (e) { setScanError((e as Error).message); }
   }, !creating);
 
-  const load = useCallback(() => {
-    api
-      .get<StaffMember[]>(`/staff/members/?q=${encodeURIComponent(q.trim())}`)
-      .then(setList)
-      .catch((e) => notify(e.message, "bad"));
-  }, [q, notify]);
-
   useEffect(() => {
-    const t = window.setTimeout(load, 250);
-    return () => window.clearTimeout(t);
-  }, [load]);
+    let active = true;
+    const timer = window.setTimeout(() => {
+      api
+        .get<StaffMember[]>(`/staff/members/?q=${encodeURIComponent(q.trim())}`)
+        .then(rows => { if (active) setList(rows); })
+        .catch((e) => { if (active) notify(e.message, "bad"); });
+    }, 200);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [q, notify]);
 
   const addGuest = (m: StaffMember) => setList((prev) => [m, ...(prev ?? []).filter((x) => x.id !== m.id)]);
 
   return (
     <>
-      <h2 className="staff-section-title">Гости и клубные карты</h2><p className="muted">Найдите гостя, чтобы открыть его счёт, пополнить баланс или выдать карту.</p>
+      <h2 className="staff-section-title">Гости клуба</h2>
       <div className="guests-head">
         <input
           className="input search"
           aria-label="Найти гостя по телефону или имени"
-          placeholder="Телефон (можно последние цифры) или имя"
+          type="search"
+          placeholder="Имя или последние цифры телефона"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => { setQ(e.target.value); setList(null); }}
         />
-        <button className="btn" onClick={nfc.scanning ? nfc.stop : startScan}>
-          {nfc.scanning ? "Отменить считывание" : "Посмотреть гостя по NFC"}
-        </button>
+        {window.isSecureContext && "NDEFReader" in window && <button className="btn" onClick={nfc.scanning ? nfc.stop : startScan}>
+          {nfc.scanning ? "Отменить считывание" : "Считать NFC-карту"}
+        </button>}
         <button className="btn btn-ghost" onClick={() => setCreating(true)}>
           + Новый гость
         </button>
@@ -119,28 +119,16 @@ export default function Guests() {
       {list === null ? (
         <div className="muted">Загрузка…</div>
       ) : list.length === 0 ? (
-        <div className="empty">Никого не нашли. Гость ещё не заполнил анкету — дайте ему QR или создайте вручную.</div>
+        <div className="empty">Гость не найден. Проверьте имя или последние цифры телефона. Если гость здесь впервые, нажмите «Новый гость».</div>
       ) : (
-        <div className="staff-guests-grid">
+        <div className="cashier-list">
           {list.map((m) => (
-            <article key={m.id} className="card staff-guest-card">
+            <Link key={m.id} className="cashier-person" to={`/staff/guests/${m.id}`}>
               <StaffPhoto name={m.full_name || "Гость"} photo={m.photo} />
-              <div className="staff-guest-card-body">
-                <h2>{m.full_name || "Без имени"}</h2>
-                <a className="staff-guest-card-phone" href={`tel:+${m.phone}`}>{formatPhone(m.phone)}</a>
-                <div className="staff-guest-card-status">
-                  {cardState(m)}
-                  {m.in_club && <span className="pill ok">Сейчас в клубе</span>}
-                  {m.is_hidden && <span className="pill bad">Скрыт</span>}
-                </div>
-                <div className="staff-guest-card-actions">
-                  <Link className="btn" to={`/staff/guests/${m.id}`}>Посмотреть гостя</Link>
-                  <Link className="btn btn-ghost" to={m.has_active_tariff ? `/staff/bind?member=${m.id}` : `/staff/guests/${m.id}`}>
-                    {m.has_active_tariff ? (m.card ? "Перевыпустить карту" : "Выдать карту") : "Оформить тариф"}
-                  </Link>
-                </div>
-              </div>
-            </article>
+              <div><strong>{m.full_name || "Без имени"}</strong><small>{formatPhone(m.phone)}</small>
+                <div className="cashier-tags">{cardState(m)}{m.in_club && <span className="pill ok">В клубе</span>}{m.is_hidden && <span className="pill">Скрыт</span>}</div>
+              </div><span aria-hidden="true">›</span>
+            </Link>
           ))}
         </div>
       )}

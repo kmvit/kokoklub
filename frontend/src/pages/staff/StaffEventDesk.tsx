@@ -44,9 +44,9 @@ export default function StaffEventDesk({ memberId, onEntry }: { memberId: number
     finally { setBusy(false); }
   }
   if (!error && (!desk || !(desk.walkin || desk.places.length || desk.hosting.length || desk.rewards.length))) return null;
-  return <section className="staff-guest-manage"><h2>Встречи участника</h2>
+  return <section className="staff-guest-manage"><h2>Вход и брони</h2>
     {error && !operation && <p role="alert">{error}</p>}
-    {desk?.walkin && <div><h3>Дневной вход</h3>
+    {desk?.walkin && <div className="cashier-admit">
       {desk.walkin.paid ? <>{desk.walkin.in_club ? <p>Вход на сегодня учтён</p> : button(memberId, "day", "Отметить повторный вход", "Без доплаты в тот же день")}</> :
         <>{button(memberId, "day", `Вход со счёта · ${desk.walkin.price} токенов`, "Дневной вход")}
           {desk.walkin.visits > 0 && button(memberId, "day_pack", "Списать 1 пакетный визит", "Дневной вход")}</>}
