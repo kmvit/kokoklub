@@ -98,6 +98,11 @@ class MembershipSale(models.Model):
     ends_at = models.DateTimeField()
 
 
+    @classmethod
+    def current_for(cls, member_id):
+        now = timezone.now()
+        return cls.objects.filter(member_id=member_id, starts_at__lte=now, ends_at__gt=now)
+
     @property
     def invite_allowance(self):
         return {self.Tariff.MONTH: 1, self.Tariff.HALF: 3, self.Tariff.YEAR: 6, self.Tariff.KEEPER: 10, self.Tariff.PATRON: 20}[self.tariff]

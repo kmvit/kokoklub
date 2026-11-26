@@ -1,10 +1,22 @@
+from django import forms
 from django.contrib import admin
 
 from .models import Card, FoodRedemption, GuestBooking, MembershipSale, OrganizerReward, Visit, VisitPack
 
 
+class CardForm(forms.ModelForm):
+    def clean(self):
+        data = super().clean()
+        member = data.get("member")
+        binding = self.instance._state.adding or {"member", "uid", "is_active"}.intersection(self.changed_data)
+        if binding and member and data.get("is_active") and not MembershipSale.current_for(member.pk).exists():
+            self.add_error("member", "Сначала оформите действующий клубный тариф.")
+        return data
+
+
 @admin.register(Card)
 class CardAdmin(admin.ModelAdmin):
+    form = CardForm
     list_display = ["uid", "member", "is_active", "issued_at", "revoked_at"]
     list_filter = ["is_active"]
     search_fields = ["uid", "member__full_name", "member__phone"]

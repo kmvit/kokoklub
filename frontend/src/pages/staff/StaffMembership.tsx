@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { Modal } from "../../components/ui";
 
@@ -6,7 +7,7 @@ type Tariff = { name: string; price: number; due: number; days: number };
 type Status = { balance: string; expires: string | null; tariffs: Record<string, Tariff>; active_tariff: string | null; invites_left: number; entry_id: number | null; legacy: boolean };
 
 
-export default function StaffMembership({ memberId, onBalance }: { memberId: number; onBalance: (balance: string) => void }) {
+export default function StaffMembership({ memberId, hasCard, onBalance }: { memberId: number; hasCard: boolean; onBalance: (balance: string) => void }) {
   const url = `/staff/members/${memberId}/membership/`;
   const [status, setStatus] = useState<Status | null>(null);
   const [action, setAction] = useState<string | null>(null);
@@ -36,11 +37,11 @@ export default function StaffMembership({ memberId, onBalance }: { memberId: num
     }
   }
 
-  if (status?.legacy) return null;
   return <section className="staff-guest-manage">
     <h2>Клубные карты</h2>
     {error && <p role="alert" className="error">{error}</p>}
     {status?.expires && <p>Карта «{status.active_tariff}» действует до {new Date(status.expires).toLocaleDateString("ru-RU")}. Осталось пригласительных: {status.invites_left}.</p>}
+    {status?.expires && <Link className="btn" to={`/staff/bind?member=${memberId}`}>{hasCard ? "Перевыпустить карту" : "Привязать карту"}</Link>}
     {status && !status.expires && <>
       {status.entry_id && <p>Оплаченный вход учтён в цене карты.</p>}
       {Object.entries(status.tariffs).map(([code, option]) =>

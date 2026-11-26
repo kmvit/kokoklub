@@ -2,7 +2,7 @@
 import logging
 
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers
@@ -14,7 +14,7 @@ from members.models import User, balance_expression
 from members.phone import normalize_phone
 from members.serializers import MemberShortSerializer, photo_url
 
-from .models import Card, Visit, normalize_uid
+from .models import Card, MembershipSale, Visit, normalize_uid
 from .queries import open_visits, with_club_flags
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     photo = serializers.SerializerMethodField()
     activity = serializers.CharField(source="activity.name", default=None, read_only=True)
     card = serializers.SerializerMethodField()
+    has_active_tariff = serializers.BooleanField(read_only=True)
     in_club = serializers.BooleanField(read_only=True)
     balance = serializers.SerializerMethodField()
     profile_complete = serializers.BooleanField(read_only=True)
@@ -32,7 +33,7 @@ class StaffMemberSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "phone", "full_name", "photo", "activity", "occupation",
-            "profile_complete", "is_hidden", "card", "in_club", "date_joined", "balance",
+            "profile_complete", "has_active_tariff", "is_hidden", "card", "in_club", "date_joined", "balance",
         ]
 
     def get_balance(self, obj):
@@ -48,7 +49,9 @@ class StaffMemberSerializer(serializers.ModelSerializer):
 
 def staff_members():
     qs = User.objects.select_related("activity").prefetch_related("cards")
-    return with_club_flags(qs).annotate(club_balance=balance_expression())
+    return with_club_flags(qs).annotate(
+        club_balance=balance_expression(), has_active_tariff=Exists(MembershipSale.current_for(OuterRef("pk"))),
+    )
 
 
 def _member_data(member_id):
@@ -107,9 +110,12 @@ class StaffMemberView(APIView):
 class MemberCardView(APIView):
     permission_classes = [IsAdminUser]
 
+    @transaction.atomic
     def post(self, request, pk):
         """Привязать карту. Прежняя карта участника (потерял) отвязывается."""
-        member = get_object_or_404(User, pk=pk, is_staff=False)
+        member = get_object_or_404(User.objects.select_for_update(), pk=pk, is_staff=False)
+        if not MembershipSale.current_for(member.pk).exists():
+            return Response({"detail": "Сначала оформите действующий клубный тариф."}, status=409)
         try:
             uid = normalize_uid(request.data.get("uid", ""))
         except ValueError as e:

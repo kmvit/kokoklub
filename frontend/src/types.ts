@@ -105,6 +105,7 @@ export interface ChatSummary {
 }
 
 export interface StaffMember {
+  has_active_tariff: boolean;
   balance: string;
   id: number;
   phone: string;

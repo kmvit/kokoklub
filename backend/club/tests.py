@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from members.models import User
 
-from .models import Card, Visit, normalize_uid
+from .models import Card, MembershipSale, Visit, normalize_uid
 
 
 class UidTests(TestCase):
@@ -29,7 +29,22 @@ class StaffTests(TestCase):
         api.force_authenticate(self.guest)
         self.assertEqual(api.get("/api/staff/inside/").status_code, 403)
 
+    def activate_tariff(self):
+        now = timezone.now()
+        return MembershipSale.objects.create(member=self.guest, cashier=self.staff, paid=1500,
+                                             starts_at=now, ends_at=now + timedelta(days=30))
+
+    def test_binding_requires_current_tariff(self):
+        url = f"/api/staff/members/{self.guest.pk}/card/"
+        self.assertEqual(self.api.post(url, {"uid": "53FB5119230001"}).status_code, 409)
+        sale = self.activate_tariff()
+        sale.ends_at = timezone.now()
+        sale.save()
+        self.assertEqual(self.api.post(url, {"uid": "53FB5119230001"}).status_code, 409)
+        self.assertFalse(self.guest.cards.exists())
+
     def test_bind_and_rebind_card(self):
+        self.activate_tariff()
         res = self.api.post(f"/api/staff/members/{self.guest.pk}/card/", {"uid": "53:FB:51:19:23:00:01"}, format="json")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["card"]["uid"], "53FB5119230001")
@@ -40,6 +55,7 @@ class StaffTests(TestCase):
         self.assertFalse(Card.objects.get(member=self.guest, uid="53FB5119230001").is_active)
 
     def test_card_of_another_member_rejected(self):
+        self.activate_tariff()
         other = User.objects.create_user("79001112244")
         Card.objects.create(member=other, uid="53FB5119230001")
         res = self.api.post(f"/api/staff/members/{self.guest.pk}/card/", {"uid": "53FB5119230001"}, format="json")

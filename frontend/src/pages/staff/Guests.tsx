@@ -135,8 +135,8 @@ export default function Guests() {
                 </div>
                 <div className="staff-guest-card-actions">
                   <Link className="btn" to={`/staff/guests/${m.id}`}>Посмотреть гостя</Link>
-                  <Link className="btn btn-ghost" to={`/staff/bind?member=${m.id}`}>
-                    {m.card ? "Перевыпустить карту" : "Выдать карту"}
+                  <Link className="btn btn-ghost" to={m.has_active_tariff ? `/staff/bind?member=${m.id}` : `/staff/guests/${m.id}`}>
+                    {m.has_active_tariff ? (m.card ? "Перевыпустить карту" : "Выдать карту") : "Оформить тариф"}
                   </Link>
                 </div>
               </div>
@@ -151,7 +151,7 @@ export default function Guests() {
           onDone={(m) => {
             addGuest(m);
             setCreating(false);
-            navigate(`/staff/bind?member=${m.id}`);
+            navigate(`/staff/guests/${m.id}`);
           }}
         />
       )}

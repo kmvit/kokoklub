@@ -27,7 +27,7 @@ def status(member):
         visit__member=member, visit__entered_at__date=timezone.localdate(),
         membershipsale__isnull=True,
     ).exclude(visit__residentbooking__guest=True, visit__residentbooking__refunded=True).order_by("-visit__entered_at").first()
-    sale = member.membership_sales.filter(starts_at__lte=timezone.now(), ends_at__gt=timezone.now()).order_by("-ends_at").first()
+    sale = MembershipSale.current_for(member.pk).order_by("-ends_at").first()
     credit = payment.amount if payment else 0
     tariffs = {
         code: {"name": code.label, "price": price, "days": days, "due": max(0, price - credit)}
@@ -57,7 +57,7 @@ class StaffMembershipView(APIView):
         member = get_object_or_404(User.objects.select_for_update(), pk=pk, is_staff=False)
         state = status(member)
         action = request.data.get("action")
-        if state["legacy"] or state["expires"]:
+        if state["expires"] or (state["legacy"] and action == "entry"):
             if isinstance(action, str) and action in TARIFFS and state["active_tariff"] != MembershipSale.Tariff(action).label:
                 return Response({"detail": "У участника уже есть действующая карта."}, status=409)
             return Response(state)

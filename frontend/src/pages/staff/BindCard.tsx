@@ -54,7 +54,7 @@ export default function BindCard() {
   useCardReader((value) => {
     setUid(value);
     setError("");
-  }, !!member && !busy && !done);
+  }, !!member?.has_active_tariff && !busy && !done);
 
   const choose = (m: StaffMember) => {
     setUid("");
@@ -65,7 +65,7 @@ export default function BindCard() {
 
   const bind = async (e: FormEvent) => {
     e.preventDefault();
-    if (!member || !uid.trim() || busy) return;
+    if (!member?.has_active_tariff || !uid.trim() || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -106,6 +106,11 @@ export default function BindCard() {
             <div><strong>{member.full_name || "Без имени"}</strong><br /><span className="muted">{formatPhone(member.phone)}</span></div>
             <button className="link" onClick={() => { nfc.stop(); setParams({}); setMember(null); setUid(""); }}>Сменить гостя</button>
           </div>
+          {!member.has_active_tariff && <Link className="btn" to={`/staff/guests/${member.id}`}>Сначала оформить тариф</Link>}
+        </>
+      )}
+      {member?.has_active_tariff && !done && (
+        <>
           {member.card && <p className="error">У гостя уже есть карта {member.card.uid}. После привязки новой старая перестанет работать.</p>}
           <p>Возьмите проданную карту и считайте её метку.</p>
           <button className="btn" onClick={nfc.scanning ? nfc.stop : () => nfc.start((value) => { setUid(value); setError(""); })}>
