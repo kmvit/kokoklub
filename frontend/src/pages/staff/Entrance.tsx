@@ -38,13 +38,14 @@ export default function Entrance() {
   }, [nfc, navigate]);
 
   useEffect(() => {
-    if (!result) return;
+    if (!result || result.kind === "error") return;
     const t = window.setTimeout(() => setResult(null), 3500);
     return () => window.clearTimeout(t);
   }, [result]);
 
   useCardReader(async (uid) => {
     try {
+      setResult(null);
       const res = await api.post<(InsideVisit & { action: "enter" | "exit" }) | { action: "desk"; member_id: number }>("/staff/scan/", { uid });
       if (res.action === "desk") { navigate(`/staff/guests/${res.member_id}`); return; }
       setResult({ kind: res.action, name: res.member.full_name.split(" ")[0] || "гость", photo: res.member.photo });
@@ -53,35 +54,37 @@ export default function Entrance() {
     }
   });
 
+  const scanning = nfc.status === "scanning";
+  const lookingUp = nfc.status === "read" && !result;
+  const error = result?.kind === "error" ? result.text : phoneReader ? nfc.error : "";
+  const visit = result && result.kind !== "error" ? result : null;
+
   return (
-    <div className={`entrance ${result?.kind ?? "idle"}`}>
-      <Link to="/staff" className="entrance-exit" onClick={stopEntranceNfc}>
-        ← персонал
-      </Link>
-      {!result && (
-        <div className="entrance-box">
-          <div className="entrance-logo">коко клуб</div>
-          <div className="entrance-title">{nfc.status === "scanning" ? "Приложите карту" : "Считайте карту"}</div>
-          {phoneReader && <button className="btn" onClick={toggleScan}>{nfc.status === "scanning" ? "Остановить считывание" : "Считать метку телефоном"}</button>}
-          <div className="entrance-sub" role="status">{nfc.status === "scanning" ? "NFC включён — поднесите метку к телефону" : phoneReader ? "Нажмите кнопку, затем поднесите метку" : "Приложите карту к внешнему ридеру или найдите гостя по телефону."}</div>
+    <section className="cashier gate">
+      <header className="cashier-head">
+        <h1>Вход в клуб</h1>
+        <Link to="/staff" onClick={stopEntranceNfc}>← В кассу</Link>
+      </header>
+      <div className="gate-body">
+        <div className="gate-reader" aria-hidden="true">
+          {visit ? <Avatar name={visit.name} photo={visit.photo} size={80} /> :
+            <div className="gate-card"><span>коко</span><i /></div>}
+        </div>
+        <div className="gate-message" role="status">
+          <h2>{visit ? (visit.kind === "enter" ? "Вход отмечен" : "Выход отмечен")
+            : error ? "Карта не считана" : lookingUp ? "Ищем гостя…" : scanning ? "Приложите карту" : "Сканер карт"}</h2>
+          <p>{visit ? (visit.kind === "enter" ? `Привет, ${visit.name}!` : `До встречи, ${visit.name}!`)
+            : error || (lookingUp ? "Открываем карточку гостя." : scanning ? "Поднесите карту гостя к задней панели телефона."
+            : phoneReader ? "Включите NFC кнопкой ниже или приложите карту к внешнему ридеру."
+            : "Приложите карту к внешнему ридеру. Если ридера нет, найдите гостя по имени или телефону.")}</p>
+        </div>
+        <div className="gate-actions">
+          {phoneReader && !visit && <button className="btn" disabled={lookingUp} onClick={toggleScan}>
+            {scanning ? "Остановить считывание" : "Считать карту телефоном"}
+          </button>}
           <Link className="btn" to="/staff/guests" onClick={stopEntranceNfc}>Найти гостя</Link>
-          {phoneReader && nfc.error && <div className="error" role="alert">{nfc.error}</div>}
         </div>
-      )}
-      {result && result.kind !== "error" && (
-        <div className="entrance-box">
-          <Avatar name={result.name} photo={result.photo} size={160} />
-          <div className="entrance-title">
-            {result.kind === "enter" ? `Привет, ${result.name}!` : `До встречи, ${result.name}!`}
-          </div>
-        </div>
-      )}
-      {result?.kind === "error" && (
-        <div className="entrance-box">
-          <div className="entrance-title">{result.text}</div>
-          <button className="btn" onClick={toggleScan}>Повторить считывание</button>
-        </div>
-      )}
-    </div>
+      </div>
+    </section>
   );
 }
