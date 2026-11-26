@@ -15,7 +15,7 @@ function resource(row: BookingRow) {
 }
 const BALANCE_REFRESH_MS = 10_000;
 
-export default function Account({ compact = false }: { compact?: boolean }) {
+export default function Account({ compact = false, onBalance }: { compact?: boolean; onBalance?: (balance: number) => void }) {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [error, setError] = useState("");
   const [showHelp, setShowHelp] = useState(false);
@@ -29,6 +29,7 @@ export default function Account({ compact = false }: { compact?: boolean }) {
         const data = await api.get<AccountData>("/me/account/");
         if (active) {
           setAccount(data);
+          onBalance?.(Number(data.balance));
           setError("");
         }
       } catch (e) {
@@ -45,7 +46,7 @@ export default function Account({ compact = false }: { compact?: boolean }) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", reload);
     };
-  }, []);
+  }, [onBalance]);
   const history = account && !compact ? [
     ...account.gifts.map(x => ({key:`gift-${x.id}`, date:x.redeemed_at, label:"Подарочная карта", amount:x.amount})),
     ...account.merch.map(x => ({key:`merch-${x.id}`, date:x.created_at, label:x.title, amount:-x.price})),

@@ -19,6 +19,7 @@ import GuestDetail from "./pages/staff/GuestDetail";
 import Inside from "./pages/staff/Inside";
 import Entrance from "./pages/staff/Entrance";
 import BindCard from "./pages/staff/BindCard";
+import type { Me } from "./types";
 import { stopEntranceNfc } from "./entranceNfc";
 
 const href = (to: To) => "#" + (typeof to === "string" ? to : createPath(to)).replace(/^\//, "");
@@ -28,15 +29,15 @@ const navigation = {
   replace: (to: To) => { location.replace(href(to)); },
 };
 
-function Screens() {
+function Screens({ onBalance }: { onBalance: (balance: number) => void }) {
   const { me, loading } = useAuth();
   if (loading) return <p role="status">Загрузка…</p>;
   return <Routes>
     <Route path="/host" element={<MeetingProgram />} />
     <Route path="/votes" element={<MeetingProgram />} />
     {me && !me.is_staff && <>
-      {["cabinet", "me"].map(path => <Route key={path} path={path} element={<Profile />} />)}
-      <Route path="history/*" element={<Account />} />
+      {["cabinet", "me"].map(path => <Route key={path} path={path} element={<Profile onBalance={onBalance} />} />)}
+      <Route path="history/*" element={<Account onBalance={onBalance} />} />
       <Route path="shop" element={<VisitPacks />} />
       {["feed", "records", "library", "club"].map(path => <Route key={path} path={path} element={<Community />} />)}
       {["members", "people"].map(path => <Route key={path} path={path} element={<Catalog />} />)}
@@ -52,10 +53,13 @@ function Screens() {
   </Routes>;
 }
 
-export function mountWorkspace(el: HTMLElement, path: string) {
+export function mountWorkspace(
+  el: HTMLElement, path: string, me: Me | null,
+  onMeChange: (me: Me | null) => void, onBalance: (balance: number) => void,
+) {
   const root = createRoot(el);
   root.render(<Router location={"/" + path} navigator={navigation}>
-    <AuthProvider><ToastProvider><Screens /></ToastProvider></AuthProvider>
+    <AuthProvider initialMe={me} onMeChange={onMeChange}><ToastProvider><Screens onBalance={onBalance} /></ToastProvider></AuthProvider>
   </Router>);
   return () => { root.unmount(); if (path === "staff/entrance") stopEntranceNfc(); };
 }

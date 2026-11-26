@@ -13,9 +13,17 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState>(null as unknown as AuthState);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(hasToken());
+export function AuthProvider({ children, initialMe, onMeChange }: {
+  children: ReactNode;
+  initialMe?: Me | null;
+  onMeChange?: (me: Me | null) => void;
+}) {
+  const [me, setUser] = useState<Me | null>(initialMe ?? null);
+  const [loading, setLoading] = useState(() => initialMe === undefined && hasToken());
+  const setMe = useCallback((user: Me | null) => {
+    setUser(user);
+    onMeChange?.(user);
+  }, [onMeChange]);
 
   const reload = useCallback(async () => {
     if (!hasToken()) {
@@ -32,11 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setMe]);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    if (initialMe === undefined) void reload();
+  }, [initialMe, reload]);
 
   const login = useCallback(
     async (tokens: { access: string; refresh: string }) => {
@@ -52,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMe(null);
       window.dispatchEvent(new Event("koko-logout"));
     }
-  }, []);
+  }, [setMe]);
 
   return (
     <AuthContext.Provider value={{ me, loading, reload, setMe, login, logout }}>

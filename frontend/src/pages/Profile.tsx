@@ -50,7 +50,7 @@ function MembershipNotice({ me }: { me: Me }) {
   );
 }
 
-export default function Profile() {
+export default function Profile({ onBalance }: { onBalance?: (balance: number) => void }) {
   const { me, setMe, logout } = useAuth();
   const notify = useToast();
   const [form, setForm] = useState<Form | null>(me ? toForm(me) : null);
@@ -106,7 +106,7 @@ export default function Profile() {
   return (
     <div className="page narrow">
       <PageHeading eyebrow="Личный кабинет / мой клуб" title="Личный кабинет" description="Ваш счёт, профиль и идеи — в одном месте." />
-      <Account /><VisitPacks />
+      <Account onBalance={onBalance} /><VisitPacks />
       <h2>Моя анкета</h2>
       <MembershipNotice me={me} />
 

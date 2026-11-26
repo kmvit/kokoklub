@@ -1,6 +1,6 @@
 import { api } from '../src/api';
 
-export function marketScreen({ S, band, pageHead, blockTitle, esc, cr, rub, A, F, modal, closeModal, draw, toast }) {
+export function marketScreen({ loadTariffs, loadReservations, S, band, pageHead, blockTitle, esc, cr, rub, A, F, modal, closeModal, draw, toast }) {
   let current;
   A.orderproduct = el => {
     const row = current.products.find(p => p.id === Number(el.dataset.id));
@@ -28,7 +28,11 @@ export function marketScreen({ S, band, pageHead, blockTitle, esc, cr, rub, A, F
     await draw(); toast('Визиты переданы.');
   };
   return async () => {
-    const [store, directory] = await Promise.all([api.get('/shop/'), S.me.resident && S.places.visits ? api.get('/directory/') : null]);
+    const [store, directory] = await Promise.all([
+      api.get('/shop/'),
+      S.me.resident ? loadReservations().then(() => S.places.visits ? api.get('/directory/') : null) : null,
+      loadTariffs(),
+    ]);
     current = store;
     return band(pageHead('shop','Лавка','Заказы, подарочные карты и пакетные визиты.') +
       '<div class="grid g3">' + store.products.map(p => `<article class="card"><h2 class="t-card">${esc(p.title)}</h2><p>${esc(p.description)}</p><p class="price">${cr(p.price)}</p>

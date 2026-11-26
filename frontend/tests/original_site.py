@@ -69,6 +69,36 @@ with sync_playwright() as pw:
     page.set_default_timeout(8000)
     login(page, "user@example.org")
     expect(page.get_by_role("heading",name="Ирина")).to_be_visible()
+    page.evaluate("""() => {
+        window.initialHeader = document.querySelector('header.top');
+        window.initialMenu = document.querySelector('nav.tabbar');
+    }""")
+    requests = []
+    def track_api(request):
+        if request.url.startswith(base + "/api/"):
+            requests.append(request.url.removeprefix(base))
+    page.on("request", track_api)
+    page.locator('footer a[href="#rules"]').click()
+    expect(page.get_by_role("heading", name="Правила клуба", exact=True)).to_be_visible()
+    assert not requests, requests
+
+    delayed_orders = []
+    orders_url = "**/api/orders/mine/"
+    page.route(orders_url, lambda route: delayed_orders.append(route))
+    page.locator('header button[data-to="cabinet"]').click()
+    expect(page.get_by_role("heading", name="Кабинет", exact=True)).to_be_visible()
+    expect(page.get_by_text("Доступно на клубном счёте")).to_be_visible()
+    expect(page.get_by_text("Загрузка заказов…")).to_be_visible()
+    assert delayed_orders
+    assert not set(requests).intersection({
+        "/api/me/", "/api/site/", "/api/events/", "/api/me/reservations/", "/api/me/invitations/",
+    }), requests
+    assert page.evaluate("""() =>
+        window.initialHeader === document.querySelector('header.top') &&
+        window.initialMenu === document.querySelector('nav.tabbar')""")
+    delayed_orders[0].continue_()
+    page.unroute(orders_url)
+    page.remove_listener("request", track_api)
     page.goto(base+"/#afisha")
     page.get_by_role("button",name="Забронировать место",exact=True).click()
     page.get_by_label("Использовать один пакетный визит",exact=False).check()

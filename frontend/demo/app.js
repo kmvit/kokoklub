@@ -9,8 +9,8 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   const num = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');   // неразрывный пробел: «1 500» не рвётся на две строки
   const pad = n => String(n).padStart(2, '0');
   const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const S = { me: null, token: null, cfg: null, pub: null,  route: '', chat: [], chips: [], pending: null, line: null, ask: null, skipped: {},
-    pop: false, voteTab: 'ideas', admTab: 'today', feedKind: 'all', playing: null, shownBal: null, day: null, who: null, wantTier: null, feedTab: 'news', topic: null, thread: null, replyTo: null, openPost: null, fq: '' };
+  const S = { me: null, token: null, cfg: null, pub: { events: [] },  route: '', chat: [], chips: [], pending: null, line: null, ask: null, skipped: {},
+    pop: false, voteTab: 'ideas', admTab: 'today', feedKind: 'all', playing: null, day: null, who: null, wantTier: null, feedTab: 'news', topic: null, thread: null, replyTo: null, openPost: null, fq: '' };
 
   // ---------------------------------------------------------------- словарь
   const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
@@ -145,8 +145,8 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       else await django.post(`/chats/${chat}/messages/`, { text: body?.note || 'Познакомимся в клубе?' });
       return { link: person.link === 'incoming' ? 'mutual' : 'sent', name: person.anketa.alias };
     }
-    if (method === 'GET' && path === '/api/events') return S.pub.events;
-    if (path === '/api/me') { await sync(); return S.me; }
+    if (method === 'GET' && path === '/api/events') return loadEvents();
+    if (path === '/api/me') { updateUser(await read('/me/')); return S.me; }
     const endpoint = path.slice(4).replace(/^\/projects(?=\/|$)/, '/project-teams').replace(/^\/feed(?=\/|$)/, '/stream') + '/';
     return method === 'GET' ? django.get(endpoint) : django.post(endpoint, body);
   }
@@ -161,31 +161,88 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
     document.body.appendChild(el); setTimeout(() => el.remove(), 2800);
   }
 
-  let syncRevision = 0;
-  async function sync() {
-    const revision = ++syncRevision;
-    const [rows, site, user] = await Promise.all([django.get('/events/'), django.get('/site/'), hasToken() ? django.get('/me/').catch(e => {
-      if (e.status !== 401) throw e;
-      return null;
-    }) : null]);
-    const [places, invites, profile] = user && !user.is_staff ? await Promise.all([django.get('/me/reservations/'), django.get('/me/invitations/'), django.get('/me/questionnaire/')]) : [null, null, null];
-    if (revision !== syncRevision) return;
+  let sessionUser = null;
+  let sessionRequest;
+  let sessionReadAt = 0;
+  const pendingReads = new Map();
+
+  function read(path) {
+    if (!pendingReads.has(path)) {
+      pendingReads.set(path, django.get(path).finally(() => pendingReads.delete(path)));
+    }
+    return pendingReads.get(path);
+  }
+
+  function updateUser(user) {
+    const previous = sessionUser?.id === user?.id ? S.me : null;
+    sessionUser = user;
+    sessionReadAt = Date.now();
+    S.me = user && { bookings: [], anketa: {}, hidden: [], progress: 0, ...previous, ...user,
+      name: user.full_name || user.email, resident: user.is_member, role: user.is_staff ? 'staff' : 'member',
+      unlock: { members: user.is_member, book: user.is_member, vote: user.is_member,
+        propose: user.is_member, projects: user.is_member, cover: previous?.progress === 100 } };
+  }
+
+  function loadSession() {
+    if (!hasToken()) {
+      updateUser(null);
+      sessionRequest = undefined;
+      return;
+    }
+    if (sessionUser && Date.now() - sessionReadAt < 60_000) return;
+    sessionRequest ??= read('/me/').then(updateUser).catch(err => {
+      if (err.status !== 401) throw err;
+      updateUser(null);
+    }).finally(() => { sessionRequest = undefined; });
+    return sessionRequest;
+  }
+
+  async function loadTariffs() {
+    const site = await read('/site/');
     for (const [key, terms] of Object.entries(site.tariffs)) {
       if (S.cfg.tiers[key]) Object.assign(S.cfg.tiers[key], terms);
     }
-    S.places = places;
-    S.invites = invites;
-    S.me = user && { ...user, name: user.full_name || user.email, resident: user.is_member, role: user.is_staff ? 'staff' : 'member',
-      ...profile, entries_left: places?.visits, invites_left: places?.invites, tier_name: invites?.tariff || 'Резидент', tier_until: invites?.expires,
-      unlock: { members: user.is_member, book: user.is_member, vote: user.is_member, propose: user.is_member, projects: user.is_member, cover: profile?.progress === 100 },
-      balance: Number(places?.balance || 0), bookings: places?.places.map(p => String(p.event_id)) || [] };
+  }
+
+  async function loadEvents() {
+    const rows = await read('/events/');
+    const resident = !!S.me?.resident;
     S.pub = { events: rows.map(e => {
       const start = new Date(Date.parse(e.starts_at) + 3 * 3600000).toISOString().slice(0, 19);
-      const resident = !!S.me?.resident;
       return { ...e, id: String(e.id), start, slot: start.slice(11, 16) < '13:00' ? 'morning' : 'evening',
         price_res: e.resident_price, price_guest: 1000 + e.guest_extra, free: resident ? e.resident_free : e.guest_free,
         capacity: resident ? e.resident_seats : e.guest_seats };
     }) };
+    return S.pub.events;
+  }
+
+  async function loadReservations() {
+    if (!S.me || S.me.is_staff) return;
+    const user = sessionUser;
+    const places = await read('/me/reservations/');
+    if (sessionUser?.id !== user.id) return;
+    S.places = places;
+    Object.assign(S.me, { entries_left: places.visits, invites_left: places.invites,
+      bookings: places.places.map(p => String(p.event_id)) });
+    updateBalance(Number(places.balance));
+  }
+
+  async function loadInvitations() {
+    if (!S.me || S.me.is_staff) return;
+    const user = sessionUser;
+    const invites = await read('/me/invitations/');
+    if (sessionUser?.id !== user.id) return;
+    S.invites = invites;
+    Object.assign(S.me, { tier_name: invites.tariff || 'Резидент', tier_until: invites.expires });
+  }
+
+  async function loadQuestionnaire() {
+    const user = sessionUser;
+    const profile = await read('/me/questionnaire/');
+    if (sessionUser?.id !== user.id) return profile;
+    Object.assign(S.me, profile);
+    S.me.unlock.cover = profile.progress === 100;
+    return profile;
   }
   function route() {
     const path = location.hash ? location.hash.slice(1) : location.pathname;
@@ -272,45 +329,124 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   const navMore = me => me?.is_staff ? [['library', 'Медиатека'], ['staff/guests', 'Гости и карты'], ['staff/bind', 'Выдать карту'], ['afisha', 'Афиша'], ['menu', 'Меню'], ['feed', 'Лента']] : [...(me && me.resident ? [['messages', 'Переписка'], ['votes', 'Голосования'], ['menu', 'Меню'], ['projects', 'Проекты']] : [['library', 'Медиатека']]), ['records', 'Записи'], ...(me ? [['shop', 'Лавка и пакеты']] : []), ...(me ? [['org', 'Мои встречи']] : []), ['host', 'Предложить встречу'], ['rules', 'Правила клуба']];
   const navTab = me => !me ? [['afisha', 'Афиша'], ['menu', 'Меню'], ['feed', 'Лента'], ['join', 'Карта']] : me.role === 'staff' ? NAV_STAFF : me.resident ? [['', 'Клуб'], ['afisha', 'Афиша'], ['members', 'Картотека'], ['feed', 'Лента']] : [['', 'Афиша'], ['feed', 'Лента'], ['join', 'Карта'], ['cabinet', 'Кабинет']];
   const navBadge = r => { const me = S.me; return r === 'members' && me && me.unread ? ` · ${me.unread}` : r === 'feed' && me && me.forum_unread ? ` · ${me.forum_unread}` : ''; };
-  const navLink = ([r, t]) => { const on = S.route.split('/')[0] === r; return `<a href="#${r}" class="${on ? 'on' : ''}"${on ? ' aria-current="page"' : ''}>${t}${navBadge(r)}</a>`; };
-  function shell(inner) {
+  const navLink = ([r, t]) => { const on = S.route.split('/')[0] === r; return `<a href="#${r}" class="${on ? 'on' : ''}"${on ? ' aria-current="page"' : ''}><span>${t}</span><span data-nav-badge>${navBadge(r)}</span></a>`; };
+  function shell() {
     const me = S.me, nav = navMain(me), more = navMore(me).filter(([r]) => !nav.some(([x]) => x === r)), c = S.cfg;
-    if (me && S.shownBal == null) S.shownBal = me.balance;
     return `<header class="top"><div class="wrap">
       <button class="logo" data-act="home" aria-label="На главную">${logo()}</button>
       <nav class="main" aria-label="Разделы">${nav.map(navLink).join('')}<details class="more"><summary>Ещё</summary><div class="more-pop">${more.map(navLink).join('')}</div></details></nav>
 
-      ${me?.is_staff ? '<button class="btn small" data-act="nav" data-to="staff/guests">Стойка</button>' : me ? `<button class="coins" data-act="nav" data-to="cabinet" aria-label="Счёт: ${num(me.balance)} кредитов"><i></i><span data-coins>${num(S.shownBal)}</span></button>` : `<button class="btn small" data-act="login">Войти</button>`}
-    </div></header><main class="enter">${inner}</main>
+      ${me?.is_staff ? '<button class="btn small" data-act="nav" data-to="staff/guests">Стойка</button>' : me ? `<button class="coins" data-act="nav" data-to="cabinet" aria-label="Клубный счёт"><i></i><span data-coins>Счёт</span></button>` : `<button class="btn small" data-act="login">Войти</button>`}
+    </div></header><main id="section-content"></main>
     <footer><div class="arches" aria-hidden="true"></div><div class="wrap"><span class="foot-brand">${emblem(64)}<span>Клуб Коко · Пятигорск<br><span class="motto small"><span>Культура</span><i></i><span>Музыка</span><i></i><span>Люди</span><i></i><span>Идеи</span></span></span></span>
       <nav class="foot-links" aria-label="Клуб"><a href="#${me ? '' : 'afisha'}">Афиша</a><a href="#menu">Меню</a><a href="#records">Записи</a><a href="#rules">Правила клуба</a><a href="#host" class="foot-host">Провести встречу в клубе</a></nav>
       <span class="foot-note">Каждый день с ${c.hours.open} до ${c.hours.close}.<br>${me ? ` <button class="link" data-act="logout">Выйти</button>` : ''}</span></div></footer>
     <nav class="tabbar" aria-label="Главные разделы">${navTab(me).map(navLink).join('')}<button type="button" data-act="more" aria-haspopup="dialog">Ещё</button></nav>
-    ${me?.resident && S.route ? (S.pop ? `<div class="pop">${gameHTML(true)}</div>` : `<button class="fab" data-act="pop" aria-label="Открыть бармена"><img src="img/barman.jpg" alt="">Бармен</button>`) : ''}`;
+    <div id="club-assistant"></div>`;
   }
+
+  let shellRole;
+  function renderShell() {
+    const app = $('#app'), role = S.me?.is_staff ? 'staff' : S.me?.resident ? 'resident' : S.me ? 'guest' : 'public';
+    if (shellRole !== role) {
+      S.unmount?.();
+      S.unmount = null;
+      app.innerHTML = shell();
+      shellRole = role;
+    }
+    const base = S.route.split('/')[0];
+    $$('.main a, .tabbar a', app).forEach(link => {
+      const active = link.getAttribute('href').slice(1) === base;
+      link.classList.toggle('on', active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    navCounts();
+    coins();
+  }
+
+  function renderAssistant() {
+    const root = $('#club-assistant');
+    const mode = !S.me?.resident || !S.route ? '' : S.pop ? 'open' : 'closed';
+    if (root.dataset.mode === mode) return;
+    root.dataset.mode = mode;
+    root.innerHTML = mode === 'open' ? `<div class="pop">${gameHTML(true)}</div>` :
+      mode === 'closed' ? '<button class="fab" data-act="pop" aria-label="Открыть бармена"><img src="img/barman.jpg" alt="">Бармен</button>' : '';
+    if (mode === 'open') { Bar.start(); Bar.paint(); refreshHud(); }
+  }
+
   const call = async (method, path, body) => {
     try { return await api(method, path, body); } catch (err) { toast(err.message); return null; }
   };
   const band = content => `<section class="band"><div class="wrap">${content}</div></section>`;
+  const loadingHTML = label => `<p role="status">Загрузка ${label}…</p>`;
+  const sectionError = err => '<p role="alert">' + esc(err.message) + '</p><button class="btn" data-act="retry">Повторить</button>';
+
+  function questionnaireHTML(profile) {
+    return `<details class="fold"><summary>Клубная анкета</summary><form class="form" data-form="clubprofile">
+      ${S.cfg.anketa.map(f => `<label class="field">${esc(f.q)}<input name="${f.k}" maxlength="400" value="${esc(profile.anketa[f.k] || '')}"></label>${f.k === 'alias' ? '' : `<label><input type="checkbox" name="hide_${f.k}" ${profile.hidden.includes(f.k) ? 'checked' : ''}> Скрыть ответ в картотеке</label>`}`).join('')}
+      <button class="btn primary">Сохранить клубную анкету</button></form></details>`;
+  }
+
+  function loadCabinetSection(selector, load, render) {
+    const el = $(selector);
+    const loading = el.innerHTML;
+    async function refresh() {
+      el.innerHTML = loading;
+      try {
+        const data = await load();
+        if (el.isConnected) el.innerHTML = render(data);
+      } catch (err) {
+        if (!el.isConnected) return;
+        el.innerHTML = sectionError(err);
+        const button = el.querySelector('button');
+        delete button.dataset.act;
+        button.addEventListener('click', refresh, { once: true });
+      }
+    }
+    void refresh();
+  }
+
   let drawing = 0;
+  let displayedRoute;
   async function draw() {
     const id = ++drawing;
-    let html, mount = false;
+    const path = S.route, base = path.split('/')[0];
+    const query = location.hash.replace(/^[^?]*/, '');
+    const routeKey = path + query;
+    const workspacePath = (path || 'staff') + query;
+    let html, mount = false, cabinet = false;
     try {
-      await sync();
+      const ready = loadSession();
+      if (ready) await ready;
       if (id !== drawing) return;
-      const path = S.route, base = path.split('/')[0], staff = S.me?.is_staff;
-      if (!path && !S.me) html = await home();
-      else if (!path && S.me?.resident) html = barPage();
-      else if (['cabinet','me'].includes(base) && S.me && !staff) {
-        mount = true;
-        html = band(pageHead('cards','Кабинет', esc(S.me.name)) + myOrdersHTML((await django.get('/orders/mine/')).orders) +
-          (S.me.resident ? `<details class="fold"><summary>Клубная анкета</summary><form class="form" data-form="clubprofile">
-            ${S.cfg.anketa.map(f => `<label class="field">${esc(f.q)}<input name="${f.k}" maxlength="400" value="${esc(S.me.anketa[f.k] || '')}"></label>${f.k === 'alias' ? '' : `<label><input type="checkbox" name="hide_${f.k}" ${S.me.hidden.includes(f.k) ? 'checked' : ''}> Скрыть ответ в картотеке</label>`}`).join('')}
-            <button class="btn primary">Сохранить клубную анкету</button></form></details>` : '') + '<div id="club-workspace"></div>');
+      renderShell();
+      if (displayedRoute !== routeKey) {
+        S.unmount?.();
+        S.unmount = null;
+        displayedRoute = routeKey;
+        $('#section-content').innerHTML = band(loadingHTML('раздела'));
+        document.body.classList.remove('noscroll');
+        if ($('.more')) $('.more').open = false;
+      }
+      const staff = S.me?.is_staff;
+      if (!path && !S.me) {
+        await Promise.all([loadEvents(), loadTariffs()]);
+        html = await home();
+      } else if (!path && S.me?.resident) {
+        await Promise.all([loadEvents(), loadReservations(), loadInvitations(), loadQuestionnaire()]);
+        if (id !== drawing) return;
+        html = barPage();
+      } else if (['cabinet','me'].includes(base) && S.me && !staff) {
+        mount = cabinet = true;
+        html = band(pageHead('cards','Кабинет', esc(S.me.name)) +
+          `<div id="cabinet-orders">${loadingHTML('заказов')}</div>` +
+          (S.me.resident ? `<div id="cabinet-questionnaire">${loadingHTML('анкеты')}</div>` : '') +
+          '<div id="club-workspace"></div>');
       }
       else if (base === 'members' && S.me?.resident) html = await members();
       else if (base === 'afisha' || (!path && !staff)) {
+        await Promise.all([loadEvents(), loadReservations(), loadInvitations()]);
         html = band(pageHead('cinema', 'Афиша', '') + calendar(S.pub.events) +
           '<ul class="agenda">' + S.pub.events.map(e => agendaRow(e, S.me?.bookings.includes(e.id))).join('') + '</ul>');
       } else if (base === 'invite') {
@@ -325,9 +461,12 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       else if (base === 'shop' && S.me && !staff) { mount = true; html = await market(); }
       else if (path === 'projects' && S.me && !staff) html = await projects();
       else if (base === 'host') html = await hostPage();
-      else if (base === 'login') { html = band('<button class="btn primary" data-act="login">Войти в клуб</button>'); queueMicrotask(() => loginModal()); }
+      else if (base === 'login') { html = band('<button class="btn primary" data-act="login">Войти в клуб</button>'); queueMicrotask(() => { if (S.route === path && id === drawing) loginModal(); }); }
       else if (base === 'rules') html = rulesPage();
-      else if (base === 'join') html = band(pageHead('cards', 'Клубные карты', 'Выберите тариф, чтобы узнать стоимость оформления.') + deckHTML());
+      else if (base === 'join') {
+        await loadTariffs();
+        html = band(pageHead('cards', 'Клубные карты', 'Выберите тариф, чтобы узнать стоимость оформления.') + deckHTML());
+      }
       else if (base === 'team' && staff) {
         const team = await django.get('/team/'); S.cfg.cards = team.cfg;
         html = band(pageHead('sets','Команда','') + teamHTML(team));
@@ -348,15 +487,28 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
         html = band('<div id="club-workspace"></div>');
       }
     } catch (e) {
-      html = band('<p role="alert">' + esc(e.message) + '</p><button class="btn" data-act="retry">Повторить</button>');
+      html = band(sectionError(e));
     }
     if (id !== drawing) return;
-    if (S.unmount) { S.unmount(); S.unmount = null; }
-    $('#app').innerHTML = shell(html);
+    renderShell();
+    S.unmount?.();
+    S.unmount = null;
+    const main = $('#section-content');
+    main.innerHTML = html;
+    renderAssistant();
+    if (cabinet) {
+      loadCabinetSection('#cabinet-orders', () => read('/orders/mine/'), data => myOrdersHTML(data.orders));
+      if (S.me.resident) loadCabinetSection('#cabinet-questionnaire', loadQuestionnaire, questionnaireHTML);
+    }
     if (mount) {
-      const { mountWorkspace } = await import('../src/workspace');
-      if (id !== drawing) return;
-      S.unmount = mountWorkspace($('#club-workspace'), (S.route || 'staff') + (location.hash.split('?')[1] ? '?' + location.hash.split('?')[1] : ''));
+      const workspace = $('#club-workspace');
+      try {
+        const { mountWorkspace } = await import('../src/workspace');
+        if (id !== drawing) return;
+        S.unmount = mountWorkspace(workspace, workspacePath, sessionUser, updateUser, updateBalance);
+      } catch (err) {
+        if (id === drawing) workspace.innerHTML = sectionError(err);
+      }
     }
     const me = S.me, r0 = S.route;
     paintCovers(); flowLayout(); S.gsel = null;
@@ -381,13 +533,18 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       requestAnimationFrame(tick);
     });
   }
-  // Счёт кредитов досчитывает до нового значения ступеньками.
   function coins() {
-    const el = $('[data-coins]'); if (!el || !S.me) return;
-    const from = S.shownBal ?? S.me.balance, to = S.me.balance; S.shownBal = to;
-    if (from === to || REDUCE) { el.textContent = num(to); return; }
-    const btn = el.parentElement; btn.classList.add('bump'); let k = 0;
-    const iv = setInterval(() => { k++; el.textContent = num(Math.round(from + (to - from) * k / 8)); if (k >= 8) { clearInterval(iv); btn.classList.remove('bump'); } }, 45);
+    const el = $('[data-coins]');
+    if (!el || S.me?.balance == null) return;
+    const text = num(S.me.balance);
+    if (el.textContent !== text) el.textContent = text;
+    el.parentElement.setAttribute('aria-label', `Счёт: ${text} кредитов`);
+  }
+
+  function updateBalance(balance) {
+    if (!S.me) return;
+    S.me.balance = balance;
+    coins();
   }
 
 
@@ -1065,16 +1222,22 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   // Картотека обновляется на месте; открытая карточка остаётся открытой.
   async function refreshMembers(focusSel) {
     const root = $('#mroot'); if (!root) return draw();
-    const y = scrollY, keep = $('.mdraw') ? $('.mdraw').scrollTop : 0; root.innerHTML = await members(true); scrollTo(0, y);
+    const y = scrollY, keep = $('.mdraw') ? $('.mdraw').scrollTop : 0;
+    const html = await members(true);
+    if (!root.isConnected) return;
+    root.innerHTML = html; scrollTo(0, y);
     paintCovers(); navCounts(); flowLayout(); S.gsel = null;
     const dr = $('.mdraw'); if (dr) { dr.scrollTop = keep; const t = $('[data-mthread]'); t && (t.scrollTop = t.scrollHeight); }
     document.body.classList.toggle('noscroll', !!dr);
     const f = focusSel && $(focusSel); f && f.focus({ preventScroll: true });
   }
   // Счётчики в меню без перерисовки страницы.
-  function navCounts() { const me = S.me; if (!me) return;
-    $$('nav.main a').forEach(a => { const r = a.getAttribute('href').slice(1), base = a.textContent.split(' · ')[0];
-      a.textContent = base + (r === 'members' && me.unread ? ` · ${me.unread}` : r === 'feed' && me.forum_unread ? ` · ${me.forum_unread}` : ''); }); }
+  function navCounts() {
+    $$('.main [data-nav-badge], .tabbar [data-nav-badge]').forEach(badge => {
+      const text = navBadge(badge.parentElement.getAttribute('href').slice(1));
+      if (badge.textContent !== text) badge.textContent = text;
+    });
+  }
 
   // ---------------------------------------------------------------- лента клуба: вместо Telegram-канала и чата
   const when = s => { const d = dt(s), today = new Date().toISOString().slice(0, 10); return s.slice(0, 10) === today ? `сегодня, ${d.t}` : `${d.d} ${d.mon.slice(0, 3)}, ${d.t}`; };
@@ -1087,7 +1250,9 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   async function refreshFeed(scrollTo) {
     const box = $('#feedbox'); if (!box) return draw();
     const ta = $('[data-form=fpost] textarea[name=text]'), draft = ta && ta.value;   // недописанное сообщение не теряем при обновлении ленты
-    box.innerHTML = await feedBody();
+    const html = await feedBody();
+    if (!box.isConnected) return;
+    box.innerHTML = html;
     const ta2 = draft && $('[data-form=fpost] textarea[name=text]'); if (ta2) ta2.value = draft;
     if (S.me) { try { setMe(await api('GET', '/api/me')); navCounts(); } catch (e) {} }
     const t = scrollTo && $(scrollTo); if (t) t.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'start' });
@@ -1107,7 +1272,8 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       const canRead = res || (me && (await api('GET', '/api/feed')).admin);
       return tabs + (canRead ? await forumBody() : lock('Темы по сферам открыты резидентам: музыка, кино, книги, дизайн, проекты и вопросы клубу. Ленту читают все.', '<button class="btn primary" data-act="nav" data-to="join">Стать резидентом</button>'));
     }
-    const d = await api('GET', '/api/feed'), kind = S.feedKind || 'all';
+    const [d, events] = await Promise.all([api('GET', '/api/feed'), loadEvents(), loadReservations()]);
+    const kind = S.feedKind || 'all';
     const th = S.openPost ? await api('GET', `/api/threads/c_${S.openPost}`).catch(() => null) : null;
     const poll = p => { const o = p.poll; if (!o) return ''; const voted = o.mine != null || !d.can_react;
       return `<div class="poll"><p class="t-card">${esc(o.q)}</p>${o.options.map((x, i) => { const pc = o.total ? Math.round(100 * x.n / o.total) : 0;
@@ -1145,7 +1311,7 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
     // Фильтр — по блоку Segmented Control (21st.dev, kuratlielia): плашка переезжает к выбранному, стрелки и Home/End, на телефоне — прокрутка с затуханием края.
     const seg = `<div class="seg-wrap"><div class="seg" role="group" aria-label="Что показать"${S.segW ? ` style="--sx:${S.segX}px;--sw:${S.segW}px" data-ready="1"` : ''}>${FEED_KINDS.map(([k, t]) => `<button type="button" class="seg-b" data-act="fkind" data-k="${k}" aria-pressed="${kind === k}" tabindex="${kind === k ? 0 : -1}">${t}</button>`).join('')}</div></div>`;
     const empty = { talk: 'Разговоров пока нет. Начните первым.', votes: 'Сейчас ничего не голосуется.', offers: 'Пока никто ничего не предложил. Поделитесь тем, что умеете или чем можете помочь.', news: 'Новостей клуба пока нет.', all: 'Здесь пока тихо.' }[kind];
-    const evs = (S.pub.events || []).slice(0, 4);
+    const evs = events.slice(0, 4);
     const side = `<aside class="feed-side">
         <section class="side-c"><h2 class="cap-title">Ближайшее в клубе</h2><ul class="agenda">${evs.map(e => agendaRow(e, me && me.bookings.includes(e.id))).join('') || '<li class="empty">Событий пока нет.</li>'}</ul><button class="link" data-act="nav" data-to="afisha">Вся афиша</button></section>
         <section class="side-c"><h2 class="cap-title">Свои для своих</h2><p>Резиденты предлагают друг другу то, что умеют: урок, консультацию, вещь. Договариваетесь напрямую.</p>${res ? '<button class="btn small" data-act="offernew">Предложить своё</button>' : ''}</section>
@@ -1276,10 +1442,13 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
       c.classList.toggle('flipped', on); fr.inert = on; bk.inert = !on; c.querySelectorAll('.mc-flip').forEach(b => b.setAttribute('aria-expanded', on));
       (on ? bk.querySelector('.mc-flip') : fr.querySelector('.mc-flip')).focus({ preventScroll: true }); },
     needres: el => A.resprice(el), scroll: el => { const t = document.getElementById(el.dataset.to); if (!t) { closeModal(); return go(S.me && !S.me.resident ? '' : el.dataset.to === 'afisha' ? 'afisha' : ''); } t.closest('details') && (t.closest('details').open = true); t && t.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth' }); },
-    login: el => loginModal(el.dataset.tab), pop: () => { S.pop = !S.pop; draw(); },
+    login: el => loginModal(el.dataset.tab), pop: async () => {
+      if (!S.pop) await Promise.all([loadQuestionnaire(), loadReservations()]);
+      S.pop = !S.pop; renderAssistant();
+    },
     chip: el => Bar.handle(el.dataset.t), skip: () => Bar.skip(),
     day: async el => { S.day = el.dataset.id; const p = $('[data-event]'); if (!p) return draw();
-      const list = S.me ? await api('GET', '/api/events') : S.pub.events, e = list.find(x => x.id === S.day); if (!e) return; S.calEvs = list;
+      const list = S.pub.events, e = list.find(x => x.id === S.day); if (!e) return; S.calEvs = list;
       p.innerHTML = dayDetail(e); $$('.slot[aria-pressed]').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === S.day));
       if (!el.closest('.wk-detail')) p.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: innerWidth < 900 ? 'start' : 'nearest' }); },
     wk: el => { S.wk = Math.max(0, Math.min(4, (S.wk || 0) + +el.dataset.d)); const box = $('[data-cal]'); if (box) box.outerHTML = calendar(S.calEvs || []); },
@@ -1432,7 +1601,7 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   addEventListener('resize', () => requestAnimationFrame(flowLayout));
   // Варианты ответа выбираются стрелками, как меню в игре. Escape закрывает окно. Enter открывает резидента на карте.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if ($('body > .modal')) { closeModal(); return; } if ($('.mdraw')) { A.mclose(); return; } if (S.pop) { S.pop = false; draw(); return; } }
+    if (e.key === 'Escape') { if ($('body > .modal')) { closeModal(); return; } if ($('.mdraw')) { A.mclose(); return; } if (S.pop) { S.pop = false; renderAssistant(); return; } }
     const g = e.target.closest && e.target.closest('g[data-act]'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); A[g.dataset.act](g); return; }
     const c = e.target.closest && e.target.closest('.choice'); if (!c || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
     e.preventDefault(); const all = $$('.choice', c.parentElement), i = all.indexOf(c), n = all[(i + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]; n && n.focus();
@@ -1503,8 +1672,10 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   F.clubprofile = async data => {
     const answers = Object.fromEntries(S.cfg.anketa.map(f => [f.k, data[f.k]]));
     const hidden = S.cfg.anketa.filter(f => data['hide_' + f.k]).map(f => f.k);
-    await django.patch('/me/questionnaire/', { answers, hidden });
-    await draw(); toast('Анкета сохранена.');
+    const profile = await django.patch('/me/questionnaire/', { answers, hidden });
+    Object.assign(S.me, profile);
+    S.me.unlock.cover = profile.progress === 100;
+    toast('Анкета сохранена.');
   };
   F.cardcheckout = async (_, form) => {
     const payment = await django.post('/me/payments/tbank/', { reference:form.dataset.reference,purpose:'card_' + form.dataset.tier,amount:S.cardQuote.due,quote:S.cardQuote });
@@ -1512,13 +1683,13 @@ import { api as django, clearTokens, setTokens, hasToken } from '../src/api';
   };
   F.authenticate = async d => {
     const tokens = await django.post(d.phone ? '/auth/register/' : '/auth/login/', { ...d, consent: !!d.consent });
-    setTokens(tokens.access, tokens.refresh); closeModal(); S.shownBal = null;
+    setTokens(tokens.access, tokens.refresh); updateUser(null); closeModal();
     if (S.wantTier) {
       const tier = S.wantTier; S.wantTier = null; await draw(); await A.buy({dataset:{tier}});
     } else if (S.route === 'afisha' || S.route.startsWith('invite/')) await draw();
     else go('');
   };
-  const market = marketScreen({ S, band, pageHead, blockTitle, esc, cr, rub, A, F, modal, closeModal, draw, toast });
+  const market = marketScreen({ loadTariffs, loadReservations, S, band, pageHead, blockTitle, esc, cr, rub, A, F, modal, closeModal, draw, toast });
   const schedule = scheduleScreens({ esc, band, pageHead, draw, modal, closeModal, toast, A, F });
   boot();
 })();
